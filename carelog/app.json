@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "CareLog",
+    "slug": "CareLog",
+    "scheme": "CareLog",
+    "version": "1.0.0",
+    "platforms": ["ios", "android"],
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      [
+        "expo-image-picker",
+        { "photosPermission": "CareLog needs photo access to attach prescription and report images." }
+      ],
+      [
+        "expo-camera",
+        { "cameraPermission": "CareLog needs camera access to photograph prescriptions and bills." }
+      ],
+      [
+        "expo-notifications",
+        { "icon": "./assets/notification-icon.png", "color": "#1A6B8A" }
+      ]
+    ],
+    "android": {
+      "package": "com.CareLog.app",
+      "permissions": ["CAMERA", "READ_MEDIA_IMAGES", "POST_NOTIFICATIONS"]
+    },
+    "ios": {
+      "bundleIdentifier": "com.CareLog.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "CareLog needs camera access to photograph prescriptions.",
+        "NSPhotoLibraryUsageDescription": "CareLog needs photo library access to attach images."
+      }
+    }
+  }
+}
