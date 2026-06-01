@@ -35,6 +35,36 @@ export function formatDaysRemaining(dateStr: string): string {
   return `${days} days left`;
 }
 
+/** Returns whole years of age from a YYYY-MM-DD date of birth. Returns 0 if DOB is in the future. */
+export function computeAge(dob: string): number {
+  const birth = parseISO(dob);
+  const now = new Date();
+  let age = now.getFullYear() - birth.getFullYear();
+  const monthDiff = now.getMonth() - birth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birth.getDate())) {
+    age--;
+  }
+  return Math.max(0, age);
+}
+
+export type ExpiryStatus = 'none' | 'active' | 'expiring' | 'expired';
+
+/**
+ * Classifies an insurance/policy expiry date relative to today.
+ * `soonDays` controls the "expiring soon" window.
+ */
+export function getExpiryStatus(
+  validUntil: string | undefined | null,
+  soonDays = 30,
+): { status: ExpiryStatus; label: string } {
+  if (!validUntil) return { status: 'none', label: '' };
+  const days = getDaysUntil(validUntil);
+  if (days < 0) return { status: 'expired', label: 'Expired' };
+  if (days === 0) return { status: 'expiring', label: 'Expires today' };
+  if (days <= soonDays) return { status: 'expiring', label: `Expires in ${days} day${days === 1 ? '' : 's'}` };
+  return { status: 'active', label: `Valid till ${formatVisitDate(validUntil)}` };
+}
+
 export function formatCurrency(amount: number | undefined | null, currency = 'INR'): string {
   if (amount == null) return '';
   const symbols: Record<string, string> = { INR: '₹', USD: '$', EUR: '€' };

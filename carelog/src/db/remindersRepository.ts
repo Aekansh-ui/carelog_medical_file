@@ -25,9 +25,12 @@ export const remindersRepository = {
 
   findByVisitId(visitId: string): Reminder | null {
     return getDb().getFirstSync<Reminder>(
-      `SELECT r.*, v.doctor_name, v.speciality_id, v.body_part_id
-       FROM reminders r JOIN visits v ON r.visit_id = v.id
-       WHERE r.visit_id = ?`,
+      `SELECT r.*, v.doctor_name, v.speciality_id, v.body_part_id,
+              m.name AS member_name, m.color AS member_color
+         FROM reminders r
+         JOIN visits v ON r.visit_id = v.id
+         LEFT JOIN members m ON v.member_id = m.id
+        WHERE r.visit_id = ?`,
       [visitId]
     );
   },
@@ -35,10 +38,13 @@ export const remindersRepository = {
   findUpcoming(): Reminder[] {
     const today = new Date().toISOString().split('T')[0];
     return getDb().getAllSync<Reminder>(
-      `SELECT r.*, v.doctor_name, v.speciality_id, v.body_part_id
-       FROM reminders r JOIN visits v ON r.visit_id = v.id
-       WHERE r.follow_up_date >= ? AND r.is_active = 1
-       ORDER BY r.follow_up_date ASC`,
+      `SELECT r.*, v.doctor_name, v.speciality_id, v.body_part_id,
+              m.name AS member_name, m.color AS member_color
+         FROM reminders r
+         JOIN visits v ON r.visit_id = v.id
+         LEFT JOIN members m ON v.member_id = m.id
+        WHERE r.follow_up_date >= ? AND r.is_active = 1
+        ORDER BY r.follow_up_date ASC`,
       [today]
     );
   },
@@ -46,10 +52,13 @@ export const remindersRepository = {
   findPast(): Reminder[] {
     const today = new Date().toISOString().split('T')[0];
     return getDb().getAllSync<Reminder>(
-      `SELECT r.*, v.doctor_name, v.speciality_id, v.body_part_id
-       FROM reminders r JOIN visits v ON r.visit_id = v.id
-       WHERE r.follow_up_date < ? OR r.is_active = 0
-       ORDER BY r.follow_up_date DESC`,
+      `SELECT r.*, v.doctor_name, v.speciality_id, v.body_part_id,
+              m.name AS member_name, m.color AS member_color
+         FROM reminders r
+         JOIN visits v ON r.visit_id = v.id
+         LEFT JOIN members m ON v.member_id = m.id
+        WHERE r.follow_up_date < ? OR r.is_active = 0
+        ORDER BY r.follow_up_date DESC`,
       [today]
     );
   },

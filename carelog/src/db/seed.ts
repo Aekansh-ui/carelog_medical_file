@@ -1,12 +1,19 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { visitsRepository } from './visitsRepository';
 import { remindersRepository } from './remindersRepository';
+import { membersRepository } from './membersRepository';
+import { insuranceRepository } from './insuranceRepository';
+import { getDb } from './database';
 import { CreateVisitInput } from '../types/Visit';
+import { DEFAULT_SELF_MEMBER_ID } from '../constants/members';
 
 const SEED_KEY = '@CareLog_seeded_v1';
+const FAMILY_SEED_KEY = '@CareLog_seeded_family_v1';
+const INSURANCE_SEED_KEY = '@CareLog_seeded_insurance_v1';
 
 const MOCK_VISITS: CreateVisitInput[] = [
   {
+    member_id: DEFAULT_SELF_MEMBER_ID,
     body_part_id: 'HEAD_BRAIN',
     speciality_id: 'ENT',
     visit_date: '2026-04-10',
@@ -21,6 +28,7 @@ const MOCK_VISITS: CreateVisitInput[] = [
     notes: 'Avoid cold beverages. Steam inhalation twice daily.',
   },
   {
+    member_id: DEFAULT_SELF_MEMBER_ID,
     body_part_id: 'CHEST_HEART',
     speciality_id: 'CARDIOLOGY',
     visit_date: '2026-03-22',
@@ -35,6 +43,7 @@ const MOCK_VISITS: CreateVisitInput[] = [
     notes: 'Continue Amlodipine 5mg OD. Reduce salt intake. Walk 30 min daily.',
   },
   {
+    member_id: DEFAULT_SELF_MEMBER_ID,
     body_part_id: 'ABDOMEN',
     speciality_id: 'GASTRO',
     visit_date: '2026-02-14',
@@ -49,6 +58,7 @@ const MOCK_VISITS: CreateVisitInput[] = [
     notes: 'Take Pantoprazole 40mg before breakfast. Avoid spicy food and late-night meals.',
   },
   {
+    member_id: DEFAULT_SELF_MEMBER_ID,
     body_part_id: 'LEGS_FEET',
     speciality_id: 'ORTHO',
     visit_date: '2026-01-30',
@@ -63,6 +73,7 @@ const MOCK_VISITS: CreateVisitInput[] = [
     notes: 'Physiotherapy 3x/week. Knee cap brace. Avoid squatting.',
   },
   {
+    member_id: DEFAULT_SELF_MEMBER_ID,
     body_part_id: 'GENERAL',
     speciality_id: 'ENDOCRINOLOGY',
     visit_date: '2025-12-05',
@@ -99,4 +110,132 @@ export async function seedIfNeeded(): Promise<void> {
   }
 
   await AsyncStorage.setItem(SEED_KEY, 'true');
+}
+
+export async function seedFamilyIfNeeded(): Promise<void> {
+  const seeded = await AsyncStorage.getItem(FAMILY_SEED_KEY);
+  if (seeded) return;
+
+  const priya = membersRepository.create({
+    name: 'Priya',
+    relationship: 'SPOUSE',
+    date_of_birth: '1988-07-20',
+    gender: 'FEMALE',
+    color: '#2E9E6B',
+  });
+
+  const aarav = membersRepository.create({
+    name: 'Aarav',
+    relationship: 'CHILD',
+    date_of_birth: '2018-04-12',
+    gender: 'MALE',
+    color: '#E67E22',
+  });
+
+  const sita = membersRepository.create({
+    name: 'Sita',
+    relationship: 'PARENT',
+    date_of_birth: '1955-09-10',
+    gender: 'FEMALE',
+    color: '#8E44AD',
+  });
+
+  // Priya: Gynaecology visit with a future follow-up → also create a reminder
+  const priyaVisit = visitsRepository.create({
+    member_id: priya.id,
+    body_part_id: 'GENERAL',
+    speciality_id: 'GYNAECOLOGY',
+    visit_date: '2026-05-10',
+    follow_up_date: '2026-08-15',
+    doctor_name: 'Dr. Meena Nair',
+    clinic_name: "Nair Women's Clinic",
+    clinic_phone: '9871234560',
+    doctor_fees: 600,
+    currency: 'INR',
+    symptoms: 'Irregular cycles for 2 months, mild pelvic discomfort.',
+    diagnosis: 'PCOD — mild. Hormonal panel ordered.',
+    notes: 'Lifestyle modification advised. Follow up in 3 months.',
+  });
+  remindersRepository.create(priyaVisit.id, priyaVisit.follow_up_date!);
+
+  // Aarav: General medicine visit
+  visitsRepository.create({
+    member_id: aarav.id,
+    body_part_id: 'GENERAL',
+    speciality_id: 'GENERAL_MEDICINE',
+    visit_date: '2026-04-22',
+    doctor_name: 'Dr. Sanjay Pillai',
+    clinic_name: 'Little Stars Paediatrics',
+    clinic_phone: '9812345670',
+    doctor_fees: 400,
+    currency: 'INR',
+    symptoms: 'Mild fever (100.4°F), runny nose, cough for 3 days.',
+    diagnosis: 'Viral URTI. Self-limiting.',
+    notes: 'Paracetamol syrup SOS. Rest and fluids. No antibiotics needed.',
+  });
+
+  // Sita: Cardiology visit with upcoming follow-up
+  const sitaVisit = visitsRepository.create({
+    member_id: sita.id,
+    body_part_id: 'CHEST_HEART',
+    speciality_id: 'CARDIOLOGY',
+    visit_date: '2026-03-08',
+    follow_up_date: '2026-06-20',
+    doctor_name: 'Dr. Rakesh Bose',
+    clinic_name: 'Bose Cardiac Centre',
+    clinic_phone: '9900011122',
+    doctor_fees: 1000,
+    currency: 'INR',
+    symptoms: 'Shortness of breath on climbing stairs. Occasional dizziness.',
+    diagnosis: 'Stable Angina. Echo: mild LV hypertrophy.',
+    notes: 'Telmisartan 40mg OD continued. Low-sodium diet. Avoid strenuous activity.',
+  });
+  remindersRepository.create(sitaVisit.id, sitaVisit.follow_up_date!);
+
+  await AsyncStorage.setItem(FAMILY_SEED_KEY, 'true');
+}
+
+export async function seedInsuranceIfNeeded(): Promise<void> {
+  const seeded = await AsyncStorage.getItem(INSURANCE_SEED_KEY);
+  if (seeded) return;
+
+  // A personal health policy for the always-present "Self" member.
+  insuranceRepository.create({
+    member_id: DEFAULT_SELF_MEMBER_ID,
+    insurer_name: 'Star Health Insurance',
+    plan_type: 'PERSONAL',
+    policy_number: 'SH-2024-887341',
+    policy_holder: 'Self',
+    sum_insured: 500000,
+    premium: 12500,
+    currency: 'INR',
+    valid_from: '2026-01-01',
+    valid_until: '2026-12-31',
+    helpline_phone: '18004252255',
+    agent_name: 'Rohit Verma',
+    notes: 'Cashless at network hospitals. Cataract sub-limit ₹40,000.',
+  });
+
+  // A family floater on the first non-Self member, if the family seed ran.
+  const otherMember = getDb().getFirstSync<{ id: string }>(
+    `SELECT id FROM members WHERE id != ? ORDER BY created_at ASC LIMIT 1`,
+    [DEFAULT_SELF_MEMBER_ID]
+  );
+  if (otherMember) {
+    insuranceRepository.create({
+      member_id: otherMember.id,
+      insurer_name: 'HDFC ERGO',
+      plan_type: 'FAMILY_FLOATER',
+      policy_number: 'HE-FLT-556210',
+      sum_insured: 1000000,
+      premium: 28000,
+      currency: 'INR',
+      valid_from: '2026-04-01',
+      valid_until: '2027-03-31',
+      helpline_phone: '18002700700',
+      notes: 'Floater shared across all family members.',
+    });
+  }
+
+  await AsyncStorage.setItem(INSURANCE_SEED_KEY, 'true');
 }

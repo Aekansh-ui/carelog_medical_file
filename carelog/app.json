@@ -7,7 +7,6 @@
     "platforms": ["ios", "android"],
     "plugins": [
       "expo-router",
-      "expo-sqlite",
       [
         "expo-image-picker",
         { "photosPermission": "CareLog needs photo access to attach prescription and report images." }

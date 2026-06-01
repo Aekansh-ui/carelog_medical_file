@@ -10,12 +10,13 @@ export const visitsRepository = {
     const now = new Date().toISOString();
     db.runSync(
       `INSERT INTO visits
-        (id, body_part_id, speciality_id, custom_speciality, visit_date, follow_up_date,
+        (id, member_id, body_part_id, speciality_id, custom_speciality, visit_date, follow_up_date,
          doctor_name, clinic_name, clinic_phone, doctor_fees, currency,
          symptoms, diagnosis, notes, created_at, updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         id,
+        input.member_id,
         input.body_part_id,
         input.speciality_id,
         input.custom_speciality ?? null,
@@ -66,10 +67,26 @@ export const visitsRepository = {
     );
   },
 
+  findBySpecialityForMember(memberId: string, bodyPartId: string, specialityId: string): Visit[] {
+    return getDb().getAllSync<Visit>(
+      `SELECT * FROM visits
+       WHERE member_id = ? AND body_part_id = ? AND speciality_id = ?
+       ORDER BY visit_date DESC`,
+      [memberId, bodyPartId, specialityId]
+    );
+  },
+
   findRecent(limit = 5): Visit[] {
     return getDb().getAllSync<Visit>(
       'SELECT * FROM visits ORDER BY visit_date DESC LIMIT ?',
       [limit]
+    );
+  },
+
+  findRecentByMember(memberId: string, limit = 5): Visit[] {
+    return getDb().getAllSync<Visit>(
+      'SELECT * FROM visits WHERE member_id = ? ORDER BY visit_date DESC LIMIT ?',
+      [memberId, limit]
     );
   },
 
@@ -81,12 +98,22 @@ export const visitsRepository = {
     return row?.count ?? 0;
   },
 
+  countBySpecialityForMember(memberId: string, specialityId: string): number {
+    const row = getDb().getFirstSync<{ count: number }>(
+      'SELECT COUNT(*) as count FROM visits WHERE member_id = ? AND speciality_id = ?',
+      [memberId, specialityId]
+    );
+    return row?.count ?? 0;
+  },
+
   search(query: string): Visit[] {
     return getDb().getAllSync<Visit>(
-      `SELECT v.* FROM visits v
-       JOIN visits_fts fts ON v.id = fts.id
-       WHERE visits_fts MATCH ?
-       ORDER BY rank`,
+      `SELECT v.*, m.name AS member_name, m.color AS member_color
+         FROM visits v
+         JOIN visits_fts fts ON v.id = fts.id
+         LEFT JOIN members m ON v.member_id = m.id
+        WHERE visits_fts MATCH ?
+        ORDER BY rank`,
       [query + '*']
     );
   },

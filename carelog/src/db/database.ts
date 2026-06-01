@@ -106,6 +106,74 @@ const MIGRATIONS: { version: number; sql: string }[] = [
       END;
     `,
   },
+  {
+    version: 3,
+    sql: `
+      CREATE TABLE IF NOT EXISTS members (
+        id            TEXT PRIMARY KEY,
+        name          TEXT NOT NULL,
+        relationship  TEXT NOT NULL DEFAULT 'OTHER',
+        date_of_birth TEXT,
+        gender        TEXT,
+        color         TEXT NOT NULL DEFAULT '#1A6B8A',
+        created_at    TEXT NOT NULL,
+        updated_at    TEXT NOT NULL
+      );
+
+      ALTER TABLE visits ADD COLUMN member_id TEXT REFERENCES members(id);
+
+      CREATE INDEX IF NOT EXISTS idx_visits_member ON visits(member_id);
+
+      INSERT OR IGNORE INTO members (id, name, relationship, color, created_at, updated_at)
+      VALUES (
+        '11111111-1111-1111-1111-111111111111',
+        'Self', 'SELF', '#1A6B8A',
+        '2026-06-01T00:00:00.000Z', '2026-06-01T00:00:00.000Z'
+      );
+
+      UPDATE visits
+         SET member_id = '11111111-1111-1111-1111-111111111111'
+       WHERE member_id IS NULL;
+    `,
+  },
+  {
+    version: 4,
+    sql: `
+      CREATE TABLE IF NOT EXISTS insurance_policies (
+        id              TEXT PRIMARY KEY,
+        member_id       TEXT NOT NULL REFERENCES members(id),
+        insurer_name    TEXT NOT NULL,
+        plan_type       TEXT NOT NULL DEFAULT 'PERSONAL',
+        policy_number   TEXT,
+        policy_holder   TEXT,
+        sum_insured     REAL,
+        premium         REAL,
+        currency        TEXT NOT NULL DEFAULT 'INR',
+        valid_from      TEXT,
+        valid_until     TEXT,
+        helpline_phone  TEXT,
+        agent_name      TEXT,
+        notes           TEXT,
+        created_at      TEXT NOT NULL,
+        updated_at      TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS insurance_documents (
+        id             TEXT PRIMARY KEY,
+        policy_id      TEXT NOT NULL REFERENCES insurance_policies(id) ON DELETE CASCADE,
+        file_path      TEXT NOT NULL,
+        file_name      TEXT NOT NULL,
+        mime_type      TEXT NOT NULL,
+        size_bytes     INTEGER NOT NULL,
+        thumbnail_path TEXT,
+        created_at     TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_insurance_member      ON insurance_policies(member_id);
+      CREATE INDEX IF NOT EXISTS idx_insurance_valid_until ON insurance_policies(valid_until);
+      CREATE INDEX IF NOT EXISTS idx_insurance_docs_policy ON insurance_documents(policy_id);
+    `,
+  },
 ];
 
 export async function initDatabase(): Promise<void> {

@@ -1,4 +1,5 @@
 import { CreateVisitInput } from '@src/types/Visit';
+import { CreateInsuranceInput } from '@src/types/Insurance';
 import { AttachmentType, ATTACHMENT_LIMITS } from '@src/types/Attachment';
 
 export function isValidDate(dateStr: string): boolean {
@@ -47,6 +48,48 @@ export function validateVisitForm(form: Partial<CreateVisitInput>): string[] {
 
 /** @deprecated Use validateVisitForm */
 export const validateVisitInput = validateVisitForm;
+
+/**
+ * Validates an insurance policy creation/edit form.
+ * Returns an array of human-readable error strings (empty = valid).
+ */
+export function validateInsuranceForm(form: Partial<CreateInsuranceInput>): string[] {
+  const errors: string[] = [];
+
+  if (!form.insurer_name || !form.insurer_name.trim()) {
+    errors.push('Insurer name is required');
+  }
+
+  if (form.valid_from && !isValidDate(form.valid_from)) {
+    errors.push('Valid-from date must be in YYYY-MM-DD format');
+  }
+
+  if (form.valid_until && !isValidDate(form.valid_until)) {
+    errors.push('Valid-until date must be in YYYY-MM-DD format');
+  }
+
+  if (
+    form.valid_from && form.valid_until &&
+    isValidDate(form.valid_from) && isValidDate(form.valid_until) &&
+    form.valid_until < form.valid_from
+  ) {
+    errors.push('Valid-until date cannot be before the valid-from date');
+  }
+
+  if (form.helpline_phone && !isValidPhone(form.helpline_phone)) {
+    errors.push('Helpline phone number is invalid');
+  }
+
+  if (form.sum_insured != null && form.sum_insured < 0) {
+    errors.push('Sum insured cannot be negative');
+  }
+
+  if (form.premium != null && form.premium < 0) {
+    errors.push('Premium cannot be negative');
+  }
+
+  return errors;
+}
 
 /**
  * Returns true if the file size is within the allowed limit for the given

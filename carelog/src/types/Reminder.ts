@@ -11,4 +11,7 @@ export interface Reminder {
   doctor_name?: string;
   speciality_id?: string;
   body_part_id?: string;
+  // Joined from members table:
+  member_name?: string;
+  member_color?: string;
 }

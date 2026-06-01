@@ -5,8 +5,11 @@ import { AttachmentType } from '@src/types/Attachment';
 const BASE_DIR = `${FileSystem.documentDirectory}carelog/`;
 const ATTACHMENTS_DIR = `${BASE_DIR}attachments/`;
 
-function visitDir(visitId: string): string {
-  return `${ATTACHMENTS_DIR}${visitId}/`;
+// Files are organised under attachments/{ownerId}/ where ownerId is a visit id
+// or an insurance-policy id. Both are UUIDs so they never collide, and the
+// storage-used / delete-all routines walk every subfolder regardless of owner.
+function ownerDir(ownerId: string): string {
+  return `${ATTACHMENTS_DIR}${ownerId}/`;
 }
 
 async function ensureDir(path: string): Promise<void> {
@@ -30,11 +33,38 @@ export const fileService = {
     sourceUri: string,
     mimeType: string,
   ): Promise<{ filePath: string; fileName: string; thumbnailPath?: string; sizeBytes: number }> {
-    const dir = visitDir(visitId);
+    return fileService.saveFile(visitId, type, sourceUri, mimeType);
+  },
+
+  /**
+   * Copies sourceUri into carelog/attachments/{policyId}/ for an insurance
+   * document, compressing + thumbnailing images. Reuses the same storage tree
+   * as visit attachments so storage accounting and delete-all cover it too.
+   */
+  async saveInsuranceDocument(
+    policyId: string,
+    sourceUri: string,
+    mimeType: string,
+  ): Promise<{ filePath: string; fileName: string; thumbnailPath?: string; sizeBytes: number }> {
+    return fileService.saveFile(policyId, 'insurance', sourceUri, mimeType);
+  },
+
+  /**
+   * Shared implementation: copies a file into carelog/attachments/{ownerId}/,
+   * compressing and generating a thumbnail for images. `label` is only used as
+   * the filename prefix.
+   */
+  async saveFile(
+    ownerId: string,
+    label: string,
+    sourceUri: string,
+    mimeType: string,
+  ): Promise<{ filePath: string; fileName: string; thumbnailPath?: string; sizeBytes: number }> {
+    const dir = ownerDir(ownerId);
     await ensureDir(dir);
 
     const ext = extForMime(mimeType);
-    const fileName = `${type}_${Date.now()}${ext}`;
+    const fileName = `${label}_${Date.now()}${ext}`;
     const isImage = mimeType.startsWith('image/');
 
     // Compress before saving if it's an image

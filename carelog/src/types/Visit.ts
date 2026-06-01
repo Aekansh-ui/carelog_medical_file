@@ -4,6 +4,7 @@ import { Attachment } from './Attachment';
 
 export interface Visit {
   id: string;                       // UUID v4
+  member_id: string;                // owning family member (UUID)
   body_part_id: BodyPartId;
   speciality_id: SpecialityId;
   custom_speciality?: string;       // Only when speciality_id === 'OTHER'
@@ -20,6 +21,9 @@ export interface Visit {
   created_at: string;               // ISO 8601
   updated_at: string;               // ISO 8601
   attachments?: Attachment[];       // Populated via JOIN in repository
+  // Joined from members table (populated in search and other JOINed queries):
+  member_name?: string;
+  member_color?: string;
 }
 
 export type CreateVisitInput = Omit<Visit, 'id' | 'created_at' | 'updated_at' | 'attachments'>;

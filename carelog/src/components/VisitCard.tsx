@@ -6,6 +6,7 @@ import { Visit } from '@src/types/Visit';
 import { SPECIALITIES } from '@src/constants/specialities';
 import { formatVisitDate, formatDaysRemaining, isOverdue } from '@src/utils/dateUtils';
 import { truncateText } from '@src/utils/formatters';
+import { MemberBadge } from './MemberBadge';
 import { Colors, Spacing, BorderRadius, Shadow } from '@src/utils/theme';
 
 interface VisitCardProps {
@@ -83,6 +84,11 @@ export function VisitCard({ visit, onPress, compact = false }: VisitCardProps) {
             </Text>
           </View>
         </View>
+      ) : null}
+
+      {/* Member badge — only shown in contexts where the JOIN provides it (e.g. search) */}
+      {visit.member_name && visit.member_color ? (
+        <MemberBadge name={visit.member_name} color={visit.member_color} size="sm" />
       ) : null}
     </Pressable>
   );

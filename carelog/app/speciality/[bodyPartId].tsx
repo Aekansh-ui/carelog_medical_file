@@ -11,9 +11,10 @@ import { useVisitsStore } from '@src/store/visitsStore';
 import { Colors, Spacing, BorderRadius } from '@src/utils/theme';
 
 export default function SpecialityScreen() {
-  const { bodyPartId } = useLocalSearchParams<{ bodyPartId: string }>();
+  const { bodyPartId, memberId } = useLocalSearchParams<{ bodyPartId: string; memberId?: string }>();
   const [showAll, setShowAll] = useState(false);
   const getSpecialityCount = useVisitsStore(s => s.getSpecialityCount);
+  const getSpecialityCountForMember = useVisitsStore(s => s.getSpecialityCountForMember);
 
   const bodyPart = BODY_PARTS.find(b => b.id === bodyPartId);
   const mappedIds = BODY_SPECIALITY_MAP[bodyPartId as BodyPartId] ?? [];
@@ -25,16 +26,24 @@ export default function SpecialityScreen() {
     ({ item }: ListRenderItemInfo<Speciality>) => (
       <SpecialityCard
         speciality={item}
-        visitCount={getSpecialityCount(item.id)}
+        visitCount={
+          memberId
+            ? getSpecialityCountForMember(memberId, item.id)
+            : getSpecialityCount(item.id)
+        }
         onPress={() =>
           router.push({
             pathname: '/visits/list/[specialityId]',
-            params: { specialityId: item.id, bodyPartId },
+            params: {
+              specialityId: item.id,
+              bodyPartId,
+              ...(memberId ? { memberId } : {}),
+            },
           })
         }
       />
     ),
-    [bodyPartId, getSpecialityCount],
+    [bodyPartId, memberId, getSpecialityCount, getSpecialityCountForMember],
   );
 
   return (
@@ -75,7 +84,10 @@ export default function SpecialityScreen() {
         onPress={() =>
           router.push({
             pathname: '/visits/new',
-            params: { bodyPartId },
+            params: {
+              bodyPartId,
+              ...(memberId ? { memberId } : {}),
+            },
           })
         }
       />
