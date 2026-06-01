@@ -1,28 +1,260 @@
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Text } from 'react-native-paper';
-import { Stack } from 'expo-router';
-import { Colors, Spacing } from '@src/utils/theme';
+import React, { useState } from 'react';
+import { View, ScrollView, StyleSheet, Pressable, Alert } from 'react-native';
+import { Text, TextInput, Button } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useMemberStore } from '@src/store/memberStore';
+import { RELATIONSHIPS, GENDERS } from '@src/constants/members';
+import { isValidDate } from '@src/utils/validators';
+import { Colors, Spacing, BorderRadius } from '@src/utils/theme';
+import type { RelationshipType, Gender } from '@src/constants/members';
 
 export default function EditMemberScreen() {
+  const { memberId } = useLocalSearchParams<{ memberId: string }>();
+  const members = useMemberStore(s => s.members);
+  const getMember = useMemberStore(s => s.getMember);
+  const updateMember = useMemberStore(s => s.updateMember);
+  const deleteMember = useMemberStore(s => s.deleteMember);
+
+  const member = getMember(memberId);
+
+  // Initialize from loaded member (store is always populated before this screen opens)
+  const [name, setName] = useState(member?.name ?? '');
+  const [relationship, setRelationship] = useState<RelationshipType>(member?.relationship ?? 'OTHER');
+  const [dob, setDob] = useState(member?.date_of_birth ?? '');
+  const [dobError, setDobError] = useState('');
+  const [gender, setGender] = useState<Gender | null>(member?.gender ?? null);
+  const [saving, setSaving] = useState(false);
+
+  function validateDob(value: string): boolean {
+    if (!value) { setDobError(''); return true; }
+    if (!isValidDate(value)) {
+      setDobError('Date must be in YYYY-MM-DD format');
+      return false;
+    }
+    setDobError('');
+    return true;
+  }
+
+  function handleSave() {
+    if (!name.trim()) { Alert.alert('Required', 'Name is required.'); return; }
+    if (!validateDob(dob)) return;
+    setSaving(true);
+    try {
+      updateMember(memberId, {
+        name: name.trim(),
+        relationship,
+        date_of_birth: dob || undefined,
+        gender: gender ?? undefined,
+      });
+      router.back();
+    } catch {
+      Alert.alert('Error', 'Failed to save member. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleDelete() {
+    if (members.length <= 1) {
+      Alert.alert('Cannot Delete', 'At least one family member must remain.');
+      return;
+    }
+    Alert.alert(
+      'Delete Member',
+      `Delete "${member?.name}"? All of their visits, attachments, and reminders will be permanently deleted.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            deleteMember(memberId);
+            router.back();
+          },
+        },
+      ],
+    );
+  }
+
   return (
-    <View style={styles.container}>
-      <Stack.Screen options={{ title: 'Edit Member' }} />
-      <Text style={styles.text}>Member edit form — coming in F5</Text>
-    </View>
+    <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <Stack.Screen
+        options={{
+          title: 'Edit Member',
+          headerStyle: { backgroundColor: Colors.primary },
+          headerTintColor: '#FFF',
+          headerTitleStyle: { fontWeight: '700' as const },
+          headerLeft: () => (
+            <Pressable onPress={() => router.back()} style={styles.headerBtn} hitSlop={8}>
+              <MaterialCommunityIcons name="close" size={24} color="#FFF" />
+            </Pressable>
+          ),
+          headerRight: () => (
+            <Button
+              mode="text" textColor="#FFF" onPress={handleSave}
+              loading={saving} disabled={saving} style={styles.headerSaveBtn}
+            >
+              Save
+            </Button>
+          ),
+        }}
+      />
+
+      <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
+        <Text style={styles.label}>Name *</Text>
+        <TextInput
+          value={name}
+          onChangeText={setName}
+          placeholder="Full name"
+          style={styles.input}
+          autoCapitalize="words"
+          maxLength={100}
+        />
+
+        <Text style={styles.label}>Relationship</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipRow}
+        >
+          {RELATIONSHIPS.map(r => (
+            <Pressable
+              key={r.id}
+              onPress={() => setRelationship(r.id)}
+              style={[styles.chip, relationship === r.id && styles.chipActive]}
+            >
+              <MaterialCommunityIcons
+                name={r.icon as any}
+                size={14}
+                color={relationship === r.id ? '#FFF' : Colors.primary}
+              />
+              <Text style={[styles.chipText, relationship === r.id && styles.chipTextActive]}>
+                {r.label}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+
+        <Text style={styles.label}>Date of Birth (optional)</Text>
+        <TextInput
+          value={dob}
+          onChangeText={v => { setDob(v); if (dobError) validateDob(v); }}
+          onBlur={() => validateDob(dob)}
+          placeholder="YYYY-MM-DD"
+          style={styles.input}
+          autoCapitalize="none"
+          keyboardType="numeric"
+          right={<TextInput.Icon icon="calendar" />}
+        />
+        {dobError ? <Text style={styles.errorText}>{dobError}</Text> : null}
+
+        <Text style={styles.label}>Gender (optional)</Text>
+        <View style={styles.chipRow}>
+          {GENDERS.map(g => (
+            <Pressable
+              key={g.id}
+              onPress={() => setGender(prev => prev === g.id ? null : g.id)}
+              style={[styles.chip, gender === g.id && styles.chipActive]}
+            >
+              <Text style={[styles.chipText, gender === g.id && styles.chipTextActive]}>
+                {g.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <View style={styles.deleteSection}>
+          <Button
+            mode="outlined"
+            onPress={handleDelete}
+            textColor={Colors.error}
+            style={styles.deleteBtn}
+            icon="trash-can-outline"
+          >
+            Delete Member
+          </Button>
+          <Text style={styles.deleteHint}>
+            Deletes this member and all their visits, attachments, and reminders.
+          </Text>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.background,
-    padding: Spacing.lg,
+  safe: { flex: 1, backgroundColor: Colors.background },
+  headerBtn: { paddingHorizontal: Spacing.sm },
+  headerSaveBtn: { marginRight: -Spacing.xs },
+  form: {
+    padding: Spacing.md,
+    paddingBottom: Spacing.xxl,
   },
-  text: {
+  label: {
+    fontSize: 12,
+    fontWeight: '600' as const,
     color: Colors.textSecondary,
-    fontSize: 16,
+    marginTop: Spacing.lg,
+    marginBottom: Spacing.xs,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  input: {
+    backgroundColor: Colors.surface,
+  },
+  errorText: {
+    fontSize: 12,
+    color: Colors.error,
+    marginTop: 4,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: 2,
+    flexWrap: 'wrap',
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 7,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
+    backgroundColor: Colors.surface,
+  },
+  chipActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  chipText: {
+    fontSize: 13,
+    color: Colors.primary,
+    fontWeight: '500' as const,
+  },
+  chipTextActive: {
+    color: '#FFF',
+  },
+  deleteSection: {
+    marginTop: Spacing.xxl,
+    paddingTop: Spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    gap: Spacing.sm,
+    alignItems: 'center',
+  },
+  deleteBtn: {
+    borderColor: Colors.error,
+    width: '100%',
+  },
+  deleteHint: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 18,
   },
 });

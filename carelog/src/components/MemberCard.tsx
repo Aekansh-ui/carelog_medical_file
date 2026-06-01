@@ -10,6 +10,7 @@ import { Colors, Spacing, BorderRadius, Shadow } from '@src/utils/theme';
 interface MemberCardProps {
   member: Member;
   onPress: () => void;
+  onEditPress?: () => void;
 }
 
 function initials(name: string): string {
@@ -22,13 +23,18 @@ function initials(name: string): string {
     .toUpperCase();
 }
 
-export function MemberCard({ member, onPress }: MemberCardProps) {
+export function MemberCard({ member, onPress, onEditPress }: MemberCardProps) {
   const rel = RELATIONSHIPS.find(r => r.id === member.relationship);
   const age = member.date_of_birth ? computeAge(member.date_of_birth) : null;
   const subtitle = [rel?.label, age != null ? `${age}y` : null].filter(Boolean).join(' · ');
 
   return (
     <Pressable onPress={onPress} style={[styles.card, Shadow.card]}>
+      {onEditPress ? (
+        <Pressable onPress={onEditPress} style={styles.editBtn} hitSlop={8}>
+          <MaterialCommunityIcons name="pencil-outline" size={14} color={Colors.textSecondary} />
+        </Pressable>
+      ) : null}
       <View style={[styles.avatar, { backgroundColor: member.color }]}>
         <Text style={styles.avatarText}>{initials(member.name)}</Text>
       </View>
@@ -94,5 +100,11 @@ const styles = StyleSheet.create({
   statText: {
     fontSize: 11,
     color: Colors.textSecondary,
+  },
+  editBtn: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    padding: 4,
   },
 });

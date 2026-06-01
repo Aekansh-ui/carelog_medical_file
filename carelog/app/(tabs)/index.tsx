@@ -77,6 +77,7 @@ export default function FamilyHomeScreen() {
       <MemberCard
         member={item}
         onPress={() => router.push(`/member/${item.id}`)}
+        onEditPress={() => router.push(`/members/edit/${item.id}`)}
       />
     ),
     []
