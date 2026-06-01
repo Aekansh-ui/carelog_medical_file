@@ -11,6 +11,9 @@ export interface Attachment {
   size_bytes: number;
   thumbnail_path?: string;          // Compressed thumbnail for images
   created_at: string;
+  // Joined from visits + members tables (present on findByType/findAll results):
+  member_name?: string;
+  member_color?: string;
 }
 
 export type CreateAttachmentInput = Omit<Attachment, 'id' | 'created_at'>;

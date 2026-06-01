@@ -36,18 +36,25 @@ export const attachmentsRepository = {
 
   findByType(type: string): Attachment[] {
     return getDb().getAllSync<Attachment>(
-      `SELECT a.*, v.doctor_name, v.visit_date, v.speciality_id
-       FROM attachments a JOIN visits v ON a.visit_id = v.id
-       WHERE a.type = ? ORDER BY a.created_at DESC`,
+      `SELECT a.*, v.doctor_name, v.visit_date, v.speciality_id,
+              m.name AS member_name, m.color AS member_color
+         FROM attachments a
+         JOIN visits v ON a.visit_id = v.id
+         LEFT JOIN members m ON v.member_id = m.id
+        WHERE a.type = ?
+        ORDER BY a.created_at DESC`,
       [type]
     );
   },
 
   findAll(): Attachment[] {
     return getDb().getAllSync<Attachment>(
-      `SELECT a.*, v.doctor_name, v.visit_date, v.speciality_id
-       FROM attachments a JOIN visits v ON a.visit_id = v.id
-       ORDER BY a.created_at DESC`
+      `SELECT a.*, v.doctor_name, v.visit_date, v.speciality_id,
+              m.name AS member_name, m.color AS member_color
+         FROM attachments a
+         JOIN visits v ON a.visit_id = v.id
+         LEFT JOIN members m ON v.member_id = m.id
+        ORDER BY a.created_at DESC`
     );
   },
 
