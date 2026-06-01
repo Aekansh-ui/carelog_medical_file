@@ -4,7 +4,7 @@ import { Stack } from 'expo-router';
 import { PaperProvider, MD3LightTheme, Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { initDatabase } from '@src/db/database';
-import { seedIfNeeded, seedFamilyIfNeeded } from '@src/db/seed';
+import { seedIfNeeded, seedFamilyIfNeeded, seedInsuranceIfNeeded } from '@src/db/seed';
 import { useSettingsStore } from '@src/store/settingsStore';
 
 const theme = {
@@ -20,7 +20,9 @@ const theme = {
 function SplashScreen() {
   return (
     <View style={styles.splash}>
-      <MaterialCommunityIcons name="heart-pulse" size={72} color="#1A6B8A" />
+      <View style={styles.splashHalo}>
+        <MaterialCommunityIcons name="heart-pulse" size={64} color="#1A6B8A" />
+      </View>
       <Text variant="headlineMedium" style={styles.splashTitle}>CareLog</Text>
       <Text variant="bodySmall" style={styles.splashSub}>Your health, organised</Text>
       <ActivityIndicator
@@ -41,6 +43,7 @@ export default function RootLayout() {
       await initDatabase();
       await seedIfNeeded();
       await seedFamilyIfNeeded();
+      await seedInsuranceIfNeeded();
       await loadSettings();
       setIsReady(true);
     })();
@@ -89,7 +92,7 @@ export default function RootLayout() {
         />
         <Stack.Screen
           name="member/[memberId]"
-          options={{ headerShown: false }}
+          options={{ headerStyle: { backgroundColor: '#1A6B8A' }, headerTintColor: '#FFFFFF' }}
         />
         <Stack.Screen
           name="members/new"
@@ -98,6 +101,22 @@ export default function RootLayout() {
         <Stack.Screen
           name="members/edit/[memberId]"
           options={{ title: 'Edit Member', presentation: 'modal', headerStyle: { backgroundColor: '#1A6B8A' }, headerTintColor: '#FFFFFF' }}
+        />
+        <Stack.Screen
+          name="insurance/member/[memberId]"
+          options={{ title: 'Insurance', headerStyle: { backgroundColor: '#1A6B8A' }, headerTintColor: '#FFFFFF' }}
+        />
+        <Stack.Screen
+          name="insurance/policy/[policyId]"
+          options={{ title: 'Insurance', headerStyle: { backgroundColor: '#1A6B8A' }, headerTintColor: '#FFFFFF' }}
+        />
+        <Stack.Screen
+          name="insurance/new"
+          options={{ title: 'Add Insurance', presentation: 'modal', headerStyle: { backgroundColor: '#1A6B8A' }, headerTintColor: '#FFFFFF' }}
+        />
+        <Stack.Screen
+          name="insurance/edit/[policyId]"
+          options={{ title: 'Edit Insurance', presentation: 'modal', headerStyle: { backgroundColor: '#1A6B8A' }, headerTintColor: '#FFFFFF' }}
         />
       </Stack>
     </PaperProvider>
@@ -112,10 +131,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
+  splashHalo: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(26,107,138,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
   splashTitle: {
     color: '#1A6B8A',
     fontWeight: '700',
     marginTop: 8,
+    letterSpacing: 0.3,
   },
   splashSub: {
     color: '#757575',

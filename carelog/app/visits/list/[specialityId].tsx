@@ -1,7 +1,7 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useCallback } from 'react';
 import { View, FlatList, StyleSheet, RefreshControl } from 'react-native';
 import { FAB, Text } from 'react-native-paper';
-import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { Stack, router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useVisitsStore } from '@src/store/visitsStore';
@@ -29,9 +29,13 @@ export default function VisitListScreen() {
     loadVisitsBySpeciality(bodyPartId ?? '', specialityId ?? '', memberId);
   }, [bodyPartId, specialityId, memberId, loadVisitsBySpeciality]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  // useFocusEffect so the list refreshes on back-navigation (e.g. after adding a visit)
+  // as well as on initial mount.
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
 
   return (
     <SafeAreaView style={styles.safe} edges={['left', 'right', 'bottom']}>

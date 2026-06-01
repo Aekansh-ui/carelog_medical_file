@@ -471,11 +471,13 @@ const styles = StyleSheet.create({
   chips: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    alignItems: 'center',
     gap: Spacing.xs,
     marginBottom: Spacing.xs,
   },
   chip: {
-    height: 28,
+    // Let Paper Chip size itself naturally; a hard height clips descenders
+    minHeight: 32,
   },
   followUpRow: {
     flexDirection: 'row',

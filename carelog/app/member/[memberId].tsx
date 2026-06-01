@@ -2,7 +2,7 @@ import React, { useEffect, useCallback } from 'react';
 import { View, FlatList, StyleSheet, Pressable, ListRenderItemInfo } from 'react-native';
 import { Badge, Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { Stack, router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useVisitsStore } from '@src/store/visitsStore';
 import { useRemindersStore } from '@src/store/remindersStore';
@@ -64,13 +64,42 @@ export default function MemberHomeScreen() {
   const loadMembers = useMemberStore(s => s.loadMembers);
   const getMember = useMemberStore(s => s.getMember);
 
+  // Load member for header title once (or when memberId changes)
   useEffect(() => {
     if (members.length === 0) loadMembers();
-    loadRecentVisitsForMember(memberId);
-    loadReminders();
   }, [memberId]);
 
+  // Refresh visit/reminder data every time this screen gains focus so that
+  // returning from the add-visit flow shows the newly created record immediately.
+  useFocusEffect(
+    useCallback(() => {
+      loadRecentVisitsForMember(memberId);
+      loadReminders();
+    }, [memberId])
+  );
+
   const member = getMember(memberId);
+
+  const InsuranceEntry = useCallback(
+    () => (
+      <Pressable
+        onPress={() => router.push(`/insurance/member/${memberId}`)}
+        style={[styles.insuranceRow, Shadow.card]}
+      >
+        <View style={styles.insuranceIcon}>
+          <MaterialCommunityIcons name="shield-check" size={22} color={Colors.primary} />
+        </View>
+        <View style={styles.insuranceText}>
+          <Text style={styles.insuranceTitle}>Insurance</Text>
+          <Text style={styles.insuranceSub} numberOfLines={1}>
+            Health & life policies, cards and helplines
+          </Text>
+        </View>
+        <MaterialCommunityIcons name="chevron-right" size={22} color={Colors.textSecondary} />
+      </Pressable>
+    ),
+    [memberId],
+  );
 
   const renderBodyPart = useCallback(
     ({ item }: ListRenderItemInfo<BodyPart>) => (
@@ -125,6 +154,7 @@ export default function MemberHomeScreen() {
         renderItem={renderBodyPart}
         contentContainerStyle={styles.gridContent}
         columnWrapperStyle={styles.row}
+        ListHeaderComponent={InsuranceEntry}
         ListFooterComponent={MemberRecentVisits}
         showsVerticalScrollIndicator={false}
       />
@@ -184,5 +214,38 @@ const styles = StyleSheet.create({
   recentList: {
     paddingHorizontal: Spacing.md,
     paddingBottom: Spacing.md,
+  },
+  insuranceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: Spacing.md,
+    marginHorizontal: Spacing.sm,
+    marginBottom: Spacing.sm,
+    gap: Spacing.sm,
+  },
+  insuranceIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.primary + '14',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  insuranceText: {
+    flex: 1,
+  },
+  insuranceTitle: {
+    fontSize: 15,
+    fontWeight: '600' as const,
+    color: Colors.textPrimary,
+  },
+  insuranceSub: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 1,
   },
 });

@@ -75,6 +75,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 2,
+    ...Shadow.sm,
   },
   avatarText: {
     color: '#FFFFFF',

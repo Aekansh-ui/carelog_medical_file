@@ -52,12 +52,15 @@ export default function SettingsScreen() {
             const db = getDb();
             db.execSync('DELETE FROM reminders;');
             db.execSync('DELETE FROM attachments;');
+            db.execSync('DELETE FROM insurance_documents;');
+            db.execSync('DELETE FROM insurance_policies;');
             db.execSync('DELETE FROM visits;');
             db.execSync('DELETE FROM visit_drafts;');
             db.runSync('DELETE FROM members WHERE id != ?', [DEFAULT_SELF_MEMBER_ID]);
             await fileService.deleteAllAttachments();
             await AsyncStorage.removeItem('@CareLog_seeded_v1');
             await AsyncStorage.removeItem('@CareLog_seeded_family_v1');
+            await AsyncStorage.removeItem('@CareLog_seeded_insurance_v1');
             Alert.alert('Done', 'All data has been deleted.');
           },
         },

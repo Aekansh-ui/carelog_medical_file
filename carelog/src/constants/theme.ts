@@ -3,12 +3,15 @@ export const Colors = {
   secondary:    '#2E9E6B',
   accent:       '#E67E22',
   error:        '#E53935',
-  background:   '#F5F7FA',
+  background:   '#F4F6FA',
   surface:      '#FFFFFF',
-  border:       '#E0E0E0',
-  textPrimary:  '#212121',
-  textSecondary:'#757575',
-  textDisabled: '#BDBDBD',
+  // Hairline border — kept very light so cards read as soft, modern surfaces
+  // rather than boxed-in wireframes. Use borderStrong for true dividers.
+  border:       '#ECEFF3',
+  borderStrong: '#DFE3E9',
+  textPrimary:  '#1B2330',
+  textSecondary:'#6B7280',
+  textDisabled: '#B4BBC6',
 };
 
 export const Spacing = {
@@ -16,7 +19,7 @@ export const Spacing = {
 };
 
 export const BorderRadius = {
-  sm: 6, md: 12, lg: 16, xl: 24, full: 999,
+  sm: 10, md: 16, lg: 20, xl: 28, full: 999,
 };
 
 export const Typography = {
@@ -29,11 +32,28 @@ export const Typography = {
 };
 
 export const Shadow = {
+  // Subtle lift for inline rows / chips
+  sm: {
+    shadowColor: '#101828',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  // Default soft, diffuse card shadow — the modern "floating surface" look
   card: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowColor: '#101828',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.07,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  // Pronounced elevation for sheets / FAB / modals
+  lg: {
+    shadowColor: '#101828',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    elevation: 8,
   },
 };

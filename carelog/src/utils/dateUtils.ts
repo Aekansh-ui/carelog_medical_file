@@ -47,6 +47,24 @@ export function computeAge(dob: string): number {
   return Math.max(0, age);
 }
 
+export type ExpiryStatus = 'none' | 'active' | 'expiring' | 'expired';
+
+/**
+ * Classifies an insurance/policy expiry date relative to today.
+ * `soonDays` controls the "expiring soon" window.
+ */
+export function getExpiryStatus(
+  validUntil: string | undefined | null,
+  soonDays = 30,
+): { status: ExpiryStatus; label: string } {
+  if (!validUntil) return { status: 'none', label: '' };
+  const days = getDaysUntil(validUntil);
+  if (days < 0) return { status: 'expired', label: 'Expired' };
+  if (days === 0) return { status: 'expiring', label: 'Expires today' };
+  if (days <= soonDays) return { status: 'expiring', label: `Expires in ${days} day${days === 1 ? '' : 's'}` };
+  return { status: 'active', label: `Valid till ${formatVisitDate(validUntil)}` };
+}
+
 export function formatCurrency(amount: number | undefined | null, currency = 'INR'): string {
   if (amount == null) return '';
   const symbols: Record<string, string> = { INR: '₹', USD: '$', EUR: '€' };

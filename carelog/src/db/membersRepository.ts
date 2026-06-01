@@ -27,7 +27,8 @@ export const membersRepository = {
     );
   },
 
-  // Cascade delete: member → their visits → attachments & reminders of those visits.
+  // Cascade delete: member → their visits (+ attachments & reminders) and
+  // their insurance policies (+ insurance documents).
   delete(id: string): void {
     const db = getDb();
     db.execSync('BEGIN');
@@ -40,6 +41,11 @@ export const membersRepository = {
         `DELETE FROM reminders WHERE visit_id IN (SELECT id FROM visits WHERE member_id = ?)`,
         [id]
       );
+      db.runSync(
+        `DELETE FROM insurance_documents WHERE policy_id IN (SELECT id FROM insurance_policies WHERE member_id = ?)`,
+        [id]
+      );
+      db.runSync(`DELETE FROM insurance_policies WHERE member_id = ?`, [id]);
       db.runSync(`DELETE FROM visits   WHERE member_id = ?`, [id]);
       db.runSync(`DELETE FROM members  WHERE id = ?`, [id]);
       db.execSync('COMMIT');

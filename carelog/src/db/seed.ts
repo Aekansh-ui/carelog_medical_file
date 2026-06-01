@@ -2,11 +2,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { visitsRepository } from './visitsRepository';
 import { remindersRepository } from './remindersRepository';
 import { membersRepository } from './membersRepository';
+import { insuranceRepository } from './insuranceRepository';
+import { getDb } from './database';
 import { CreateVisitInput } from '../types/Visit';
 import { DEFAULT_SELF_MEMBER_ID } from '../constants/members';
 
 const SEED_KEY = '@CareLog_seeded_v1';
 const FAMILY_SEED_KEY = '@CareLog_seeded_family_v1';
+const INSURANCE_SEED_KEY = '@CareLog_seeded_insurance_v1';
 
 const MOCK_VISITS: CreateVisitInput[] = [
   {
@@ -190,4 +193,49 @@ export async function seedFamilyIfNeeded(): Promise<void> {
   remindersRepository.create(sitaVisit.id, sitaVisit.follow_up_date!);
 
   await AsyncStorage.setItem(FAMILY_SEED_KEY, 'true');
+}
+
+export async function seedInsuranceIfNeeded(): Promise<void> {
+  const seeded = await AsyncStorage.getItem(INSURANCE_SEED_KEY);
+  if (seeded) return;
+
+  // A personal health policy for the always-present "Self" member.
+  insuranceRepository.create({
+    member_id: DEFAULT_SELF_MEMBER_ID,
+    insurer_name: 'Star Health Insurance',
+    plan_type: 'PERSONAL',
+    policy_number: 'SH-2024-887341',
+    policy_holder: 'Self',
+    sum_insured: 500000,
+    premium: 12500,
+    currency: 'INR',
+    valid_from: '2026-01-01',
+    valid_until: '2026-12-31',
+    helpline_phone: '18004252255',
+    agent_name: 'Rohit Verma',
+    notes: 'Cashless at network hospitals. Cataract sub-limit ₹40,000.',
+  });
+
+  // A family floater on the first non-Self member, if the family seed ran.
+  const otherMember = getDb().getFirstSync<{ id: string }>(
+    `SELECT id FROM members WHERE id != ? ORDER BY created_at ASC LIMIT 1`,
+    [DEFAULT_SELF_MEMBER_ID]
+  );
+  if (otherMember) {
+    insuranceRepository.create({
+      member_id: otherMember.id,
+      insurer_name: 'HDFC ERGO',
+      plan_type: 'FAMILY_FLOATER',
+      policy_number: 'HE-FLT-556210',
+      sum_insured: 1000000,
+      premium: 28000,
+      currency: 'INR',
+      valid_from: '2026-04-01',
+      valid_until: '2027-03-31',
+      helpline_phone: '18002700700',
+      notes: 'Floater shared across all family members.',
+    });
+  }
+
+  await AsyncStorage.setItem(INSURANCE_SEED_KEY, 'true');
 }
