@@ -24,11 +24,13 @@ import { formatVisitDate } from '@src/utils/dateUtils';
 import { Colors, Spacing, BorderRadius, Shadow } from '@src/utils/theme';
 import { Attachment, AttachmentType } from '@src/types/Attachment';
 
-// findAll() JOINs visits so rows carry these extra columns
+// findAll() JOINs visits + members so rows carry these extra columns
 interface AttachmentWithVisit extends Attachment {
   doctor_name?: string | null;
   visit_date?: string | null;
   speciality_id?: string | null;
+  member_name?: string;
+  member_color?: string;
 }
 
 type FilterType = 'all' | AttachmentType;
@@ -112,10 +114,14 @@ function GridCell({ item, cellSize, onPress, onLongPress }: CellProps) {
           />
         )}
 
-        {/* Type badge overlay */}
+        {/* Type badge overlay — bottom left */}
         <View style={[styles.typeBadge, { backgroundColor: typeColor + 'DD' }]}>
           <Text style={styles.typeBadgeText}>{TYPE_BADGE[item.type]}</Text>
         </View>
+        {/* Member color dot — top right */}
+        {item.member_color ? (
+          <View style={[styles.memberDot, { backgroundColor: item.member_color }]} />
+        ) : null}
       </View>
 
       {item.visit_date ? (
@@ -587,6 +593,16 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '700',
     color: '#FFF',
+  },
+  memberDot: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.7)',
   },
   cellDate: {
     fontSize: 10,

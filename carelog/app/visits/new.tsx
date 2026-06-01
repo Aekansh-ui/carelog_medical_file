@@ -12,12 +12,13 @@ import { fileService } from '@src/services/fileService';
 import type { BodyPartId } from '@src/constants/bodyParts';
 import type { SpecialityId } from '@src/constants/specialities';
 import { CreateVisitInput } from '@src/types/Visit';
+import { DEFAULT_SELF_MEMBER_ID } from '@src/constants/members';
 import { validateVisitForm } from '@src/utils/validators';
 import { Colors, Spacing } from '@src/utils/theme';
 import { VisitForm, VisitFormHandle } from '@src/components/VisitForm';
 
 export default function NewVisitScreen() {
-  const params = useLocalSearchParams<{ bodyPartId: string; specialityId: string }>();
+  const params = useLocalSearchParams<{ bodyPartId: string; specialityId: string; memberId?: string }>();
   const formRef = useRef<VisitFormHandle>(null);
   const createVisit = useVisitsStore(s => s.createVisit);
   const createReminder = useRemindersStore(s => s.createReminder);
@@ -26,6 +27,7 @@ export default function NewVisitScreen() {
   const initialForm = {
     body_part_id: params.bodyPartId as BodyPartId | undefined,
     speciality_id: params.specialityId as SpecialityId | undefined,
+    member_id: params.memberId ?? DEFAULT_SELF_MEMBER_ID,
   };
 
   async function handleSave() {

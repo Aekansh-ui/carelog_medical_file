@@ -4,6 +4,7 @@ import { Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Reminder } from '@src/types/Reminder';
 import { SPECIALITIES } from '@src/constants/specialities';
+import { MemberBadge } from './MemberBadge';
 import { formatVisitDate, formatDaysRemaining, isOverdue } from '@src/utils/dateUtils';
 import { Colors, Spacing, BorderRadius, Shadow } from '@src/utils/theme';
 
@@ -67,6 +68,13 @@ export function ReminderCard({
               />
               <Text style={styles.specialityLabel}> {speciality.label}</Text>
             </View>
+          ) : null}
+          {reminder.member_name && reminder.member_color ? (
+            <MemberBadge
+              name={reminder.member_name}
+              color={reminder.member_color}
+              size="sm"
+            />
           ) : null}
           <View style={styles.dateRow}>
             <MaterialCommunityIcons

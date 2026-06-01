@@ -12,9 +12,10 @@ import { EmptyState } from '@src/components/EmptyState';
 import { Colors, Spacing, BorderRadius } from '@src/utils/theme';
 
 export default function VisitListScreen() {
-  const { specialityId, bodyPartId } = useLocalSearchParams<{
+  const { specialityId, bodyPartId, memberId } = useLocalSearchParams<{
     specialityId: string;
     bodyPartId: string;
+    memberId?: string;
   }>();
 
   const currentSpecialityVisits = useVisitsStore(s => s.currentSpecialityVisits);
@@ -25,8 +26,8 @@ export default function VisitListScreen() {
   const bodyPart = BODY_PARTS.find(b => b.id === bodyPartId);
 
   const load = useCallback(() => {
-    loadVisitsBySpeciality(bodyPartId ?? '', specialityId ?? '');
-  }, [bodyPartId, specialityId, loadVisitsBySpeciality]);
+    loadVisitsBySpeciality(bodyPartId ?? '', specialityId ?? '', memberId);
+  }, [bodyPartId, specialityId, memberId, loadVisitsBySpeciality]);
 
   useEffect(() => {
     load();
@@ -94,7 +95,11 @@ export default function VisitListScreen() {
               onAction={() =>
                 router.push({
                   pathname: '/visits/new',
-                  params: { bodyPartId, specialityId },
+                  params: {
+                    bodyPartId,
+                    specialityId,
+                    ...(memberId ? { memberId } : {}),
+                  },
                 })
               }
             />
@@ -122,7 +127,11 @@ export default function VisitListScreen() {
         onPress={() =>
           router.push({
             pathname: '/visits/new',
-            params: { bodyPartId, specialityId },
+            params: {
+              bodyPartId,
+              specialityId,
+              ...(memberId ? { memberId } : {}),
+            },
           })
         }
       />

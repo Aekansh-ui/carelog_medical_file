@@ -8,12 +8,14 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useVisitsStore } from '@src/store/visitsStore';
+import { useMemberStore } from '@src/store/memberStore';
 import { attachmentsRepository } from '@src/db/attachmentsRepository';
 import { fileService } from '@src/services/fileService';
 import { Attachment } from '@src/types/Attachment';
 import { SPECIALITIES } from '@src/constants/specialities';
 import { BODY_PARTS } from '@src/constants/bodyParts';
 import { AttachmentGrid } from '@src/components/AttachmentGrid';
+import { MemberBadge } from '@src/components/MemberBadge';
 import { formatVisitDate, formatDaysRemaining, isOverdue } from '@src/utils/dateUtils';
 import { formatCurrency } from '@src/utils/formatters';
 import { Colors, Spacing, BorderRadius, Shadow } from '@src/utils/theme';
@@ -124,6 +126,9 @@ export default function VisitDetailScreen() {
   const selectedVisit = useVisitsStore(s => s.selectedVisit);
   const loadVisitById = useVisitsStore(s => s.loadVisitById);
   const deleteVisit = useVisitsStore(s => s.deleteVisit);
+  const members = useMemberStore(s => s.members);
+  const loadMembers = useMemberStore(s => s.loadMembers);
+  const getMember = useMemberStore(s => s.getMember);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [viewerAtt, setViewerAtt] = useState<Attachment | null>(null);
 
@@ -131,12 +136,14 @@ export default function VisitDetailScreen() {
     if (visitId) {
       loadVisitById(visitId);
       setAttachments(attachmentsRepository.findByVisitId(visitId));
+      if (members.length === 0) loadMembers();
     }
   }, [visitId]);
 
   const visit = selectedVisit;
   const speciality = visit ? SPECIALITIES.find(s => s.id === visit.speciality_id) : undefined;
   const bodyPart = visit ? BODY_PARTS.find(b => b.id === visit.body_part_id) : undefined;
+  const member = visit ? getMember(visit.member_id) : undefined;
 
   const prescriptions = attachments.filter(a => a.type === 'prescription');
   const medicines = attachments.filter(a => a.type === 'medicine');
@@ -244,6 +251,9 @@ export default function VisitDetailScreen() {
                   <Chip style={styles.chip} textStyle={{ fontSize: 12 }}>
                     {bodyPart.label}
                   </Chip>
+                )}
+                {member && (
+                  <MemberBadge name={member.name} color={member.color} />
                 )}
               </View>
 
