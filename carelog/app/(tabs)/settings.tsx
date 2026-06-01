@@ -8,6 +8,7 @@ import { exportService } from '@src/services/exportService';
 import { fileService } from '@src/services/fileService';
 import { getDb } from '@src/db/database';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DEFAULT_SELF_MEMBER_ID } from '@src/constants/members';
 import { Colors, Spacing } from '@src/utils/theme';
 
 export default function SettingsScreen() {
@@ -53,8 +54,10 @@ export default function SettingsScreen() {
             db.execSync('DELETE FROM attachments;');
             db.execSync('DELETE FROM visits;');
             db.execSync('DELETE FROM visit_drafts;');
+            db.runSync('DELETE FROM members WHERE id != ?', [DEFAULT_SELF_MEMBER_ID]);
             await fileService.deleteAllAttachments();
             await AsyncStorage.removeItem('@CareLog_seeded_v1');
+            await AsyncStorage.removeItem('@CareLog_seeded_family_v1');
             Alert.alert('Done', 'All data has been deleted.');
           },
         },

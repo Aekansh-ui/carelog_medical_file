@@ -4,7 +4,7 @@ import { Stack } from 'expo-router';
 import { PaperProvider, MD3LightTheme, Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { initDatabase } from '@src/db/database';
-import { seedIfNeeded } from '@src/db/seed';
+import { seedIfNeeded, seedFamilyIfNeeded } from '@src/db/seed';
 import { useSettingsStore } from '@src/store/settingsStore';
 
 const theme = {
@@ -40,6 +40,7 @@ export default function RootLayout() {
     (async () => {
       await initDatabase();
       await seedIfNeeded();
+      await seedFamilyIfNeeded();
       await loadSettings();
       setIsReady(true);
     })();
