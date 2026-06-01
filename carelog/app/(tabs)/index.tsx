@@ -1,123 +1,127 @@
-import React, { useEffect, useCallback } from 'react';
-import { View, FlatList, StyleSheet, Pressable, ListRenderItemInfo } from 'react-native';
-import { Badge, Text } from 'react-native-paper';
+import React, { useCallback } from 'react';
+import { View, FlatList, StyleSheet, Pressable } from 'react-native';
+import { Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useVisitsStore } from '@src/store/visitsStore';
-import { useRemindersStore } from '@src/store/remindersStore';
-import { BODY_PARTS, BodyPart } from '@src/constants/bodyParts';
-import { VisitCard } from '@src/components/VisitCard';
+import { useMemberStore } from '@src/store/memberStore';
+import { MemberCard } from '@src/components/MemberCard';
 import { SectionHeader } from '@src/components/SectionHeader';
 import { EmptyState } from '@src/components/EmptyState';
+import { SPECIALITIES } from '@src/constants/specialities';
+import { formatVisitDate, formatDaysRemaining } from '@src/utils/dateUtils';
 import { Colors, Spacing, BorderRadius, Shadow } from '@src/utils/theme';
+import type { FamilySummary, Member } from '@src/types/Member';
 
-function BodyPartCard({ bodyPart, onPress }: { bodyPart: BodyPart; onPress: () => void }) {
+type FollowUpItem = FamilySummary['upcomingFollowUps'][0];
+
+function FollowUpRow({ item }: { item: FollowUpItem }) {
+  const spec = SPECIALITIES.find(s => s.id === item.speciality_id);
   return (
-    <Pressable onPress={onPress} style={[styles.bodyCard, Shadow.card]}>
-      <MaterialCommunityIcons name={bodyPart.icon as any} size={32} color={Colors.primary} />
-      <Text style={styles.bodyLabel}>{bodyPart.label}</Text>
-      <Text style={styles.bodyDesc} numberOfLines={1}>{bodyPart.description}</Text>
+    <Pressable
+      onPress={() => router.push(`/visits/${item.visit_id}`)}
+      style={[styles.followUpCard, Shadow.card]}
+    >
+      <View style={[styles.memberDot, { backgroundColor: item.member_color }]} />
+      <View style={styles.followUpInfo}>
+        <Text style={styles.followUpTitle} numberOfLines={1}>
+          {item.member_name}
+          {spec ? `  ·  ${spec.shortLabel}` : ''}
+        </Text>
+        {item.doctor_name ? (
+          <Text style={styles.followUpDoctor} numberOfLines={1}>{item.doctor_name}</Text>
+        ) : null}
+        <Text style={styles.followUpDate}>
+          {formatVisitDate(item.follow_up_date)}
+          {'  ·  '}
+          {formatDaysRemaining(item.follow_up_date)}
+        </Text>
+      </View>
+      <MaterialCommunityIcons name="chevron-right" size={20} color={Colors.textSecondary} />
     </Pressable>
   );
 }
 
-function RecentVisitsFooter() {
-  const recentVisits = useVisitsStore(s => s.recentVisits);
-
+function FollowUpSection({ items }: { items: FollowUpItem[] }) {
   return (
-    <View>
-      <SectionHeader title="Recent Visits" />
-      {recentVisits.length === 0 ? (
+    <View style={styles.followUpSection}>
+      <SectionHeader title="Upcoming Follow-ups" />
+      {items.length === 0 ? (
         <EmptyState
-          icon="stethoscope"
-          title="No visits yet"
-          subtitle="Tap a body part above to add your first visit"
+          icon="calendar-clock"
+          title="No upcoming follow-ups"
+          subtitle="Follow-ups from all family members appear here"
         />
       ) : (
-        <FlatList
-          horizontal
-          data={recentVisits}
-          keyExtractor={v => v.id}
-          renderItem={({ item }) => (
-            <VisitCard
-              visit={item}
-              onPress={() => router.push(`/visits/${item.id}`)}
-              compact
-            />
-          )}
-          contentContainerStyle={styles.recentList}
-          showsHorizontalScrollIndicator={false}
-        />
+        items.map(item => <FollowUpRow key={item.visit_id} item={item} />)
       )}
     </View>
   );
 }
 
-export default function HomeScreen() {
-  const loadRecentVisits = useVisitsStore(s => s.loadRecentVisits);
-  const upcoming = useRemindersStore(s => s.upcoming);
-  const loadReminders = useRemindersStore(s => s.load);
+export default function FamilyHomeScreen() {
+  const members = useMemberStore(s => s.members);
+  const summary = useMemberStore(s => s.summary);
+  const loadMembers = useMemberStore(s => s.loadMembers);
+  const loadSummary = useMemberStore(s => s.loadSummary);
 
-  useEffect(() => {
-    loadRecentVisits();
-    loadReminders();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      loadMembers();
+      loadSummary();
+    }, [])
+  );
 
-  const renderBodyPart = useCallback(
-    ({ item }: ListRenderItemInfo<BodyPart>) => (
-      <BodyPartCard
-        bodyPart={item}
-        onPress={() => router.push(`/speciality/${item.id}`)}
+  const renderMember = useCallback(
+    ({ item }: { item: Member }) => (
+      <MemberCard
+        member={item}
+        onPress={() => router.push(`/member/${item.id}`)}
       />
     ),
-    [],
+    []
   );
+
+  const upcomingFollowUps = summary?.upcomingFollowUps ?? [];
 
   return (
     <SafeAreaView style={styles.safe} edges={['left', 'right']}>
       <Stack.Screen
         options={{
-          title: 'CareLog',
+          title: 'My Family',
           headerStyle: { backgroundColor: Colors.primary },
           headerTintColor: '#FFF',
           headerTitleStyle: { fontWeight: '700' as const },
           headerRight: () => (
-            <View style={styles.headerRight}>
-              <Pressable
-                onPress={() => router.push('/search')}
-                style={styles.headerBtn}
-                hitSlop={8}
-              >
-                <MaterialCommunityIcons name="magnify" size={24} color="#FFF" />
-              </Pressable>
-              <View>
-                <Pressable
-                  onPress={() => router.push('/(tabs)/reminders')}
-                  style={styles.headerBtn}
-                  hitSlop={8}
-                >
-                  <MaterialCommunityIcons name="bell-outline" size={24} color="#FFF" />
-                </Pressable>
-                {upcoming.length > 0 && (
-                  <Badge size={16} style={styles.badge}>{upcoming.length}</Badge>
-                )}
-              </View>
-            </View>
+            <Pressable
+              onPress={() => router.push('/members/new')}
+              style={styles.headerBtn}
+              hitSlop={8}
+            >
+              <Text style={styles.addText}>＋ Add</Text>
+            </Pressable>
           ),
         }}
       />
 
-      <FlatList
-        data={BODY_PARTS}
-        keyExtractor={item => item.id}
-        numColumns={2}
-        renderItem={renderBodyPart}
-        contentContainerStyle={styles.gridContent}
-        columnWrapperStyle={styles.row}
-        ListFooterComponent={RecentVisitsFooter}
-        showsVerticalScrollIndicator={false}
-      />
+      {members.length === 0 ? (
+        <EmptyState
+          icon="account-group"
+          title="No family members yet"
+          subtitle={'Tap "＋ Add" to add your first family member'}
+        />
+      ) : (
+        <FlatList
+          data={members}
+          keyExtractor={item => item.id}
+          numColumns={2}
+          renderItem={renderMember}
+          contentContainerStyle={styles.gridContent}
+          columnWrapperStyle={styles.row}
+          ListFooterComponent={<FollowUpSection items={upcomingFollowUps} />}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -127,19 +131,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
-  headerRight: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    marginRight: 4,
-  },
   headerBtn: {
     paddingHorizontal: 8,
   },
-  badge: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    backgroundColor: Colors.accent,
+  addText: {
+    color: '#FFF',
+    fontSize: 15,
+    fontWeight: '600' as const,
   },
   gridContent: {
     paddingHorizontal: Spacing.sm,
@@ -150,29 +148,42 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     marginBottom: Spacing.sm,
   },
-  bodyCard: {
-    flex: 1,
+  followUpSection: {
+    marginTop: Spacing.sm,
+  },
+  followUpCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.md,
+    marginHorizontal: Spacing.md,
+    marginBottom: Spacing.sm,
     padding: Spacing.md,
-    alignItems: 'center',
     borderWidth: 1,
     borderColor: Colors.border,
-    gap: Spacing.xs,
+    gap: Spacing.sm,
   },
-  bodyLabel: {
-    fontSize: 13,
-    fontWeight: '600',
+  memberDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    flexShrink: 0,
+  },
+  followUpInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  followUpTitle: {
+    fontSize: 14,
+    fontWeight: '600' as const,
     color: Colors.textPrimary,
-    textAlign: 'center',
   },
-  bodyDesc: {
-    fontSize: 11,
+  followUpDoctor: {
+    fontSize: 12,
     color: Colors.textSecondary,
-    textAlign: 'center',
   },
-  recentList: {
-    paddingHorizontal: Spacing.md,
-    paddingBottom: Spacing.md,
+  followUpDate: {
+    fontSize: 12,
+    color: Colors.textSecondary,
   },
 });

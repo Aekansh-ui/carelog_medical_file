@@ -31,8 +31,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
-          tabBarIcon: icon('home-heart'),
+          title: 'Family',
+          tabBarIcon: icon('account-group'),
         }}
       />
       <Tabs.Screen

@@ -86,6 +86,18 @@ export default function RootLayout() {
           name="search"
           options={{ title: 'Search', headerStyle: { backgroundColor: '#1A6B8A' }, headerTintColor: '#FFFFFF' }}
         />
+        <Stack.Screen
+          name="member/[memberId]"
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="members/new"
+          options={{ title: 'Add Member', presentation: 'modal', headerStyle: { backgroundColor: '#1A6B8A' }, headerTintColor: '#FFFFFF' }}
+        />
+        <Stack.Screen
+          name="members/edit/[memberId]"
+          options={{ title: 'Edit Member', presentation: 'modal', headerStyle: { backgroundColor: '#1A6B8A' }, headerTintColor: '#FFFFFF' }}
+        />
       </Stack>
     </PaperProvider>
   );
