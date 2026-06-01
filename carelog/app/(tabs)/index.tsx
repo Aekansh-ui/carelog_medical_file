@@ -1,8 +1,8 @@
 import React, { useEffect, useCallback } from 'react';
 import { View, FlatList, StyleSheet, Pressable, ListRenderItemInfo } from 'react-native';
-import { Appbar, Badge, Text } from 'react-native-paper';
+import { Badge, Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useVisitsStore } from '@src/store/visitsStore';
 import { useRemindersStore } from '@src/store/remindersStore';
@@ -76,24 +76,37 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['left', 'right']}>
-      <Appbar.Header style={styles.header}>
-        <Appbar.Content title="CareLog" titleStyle={styles.headerTitle} />
-        <Appbar.Action
-          icon="magnify"
-          iconColor="#FFF"
-          onPress={() => router.push('/search')}
-        />
-        <View>
-          <Appbar.Action
-            icon="bell-outline"
-            iconColor="#FFF"
-            onPress={() => router.push('/(tabs)/reminders')}
-          />
-          {upcoming.length > 0 && (
-            <Badge size={16} style={styles.badge}>{upcoming.length}</Badge>
-          )}
-        </View>
-      </Appbar.Header>
+      <Stack.Screen
+        options={{
+          title: 'CareLog',
+          headerStyle: { backgroundColor: Colors.primary },
+          headerTintColor: '#FFF',
+          headerTitleStyle: { fontWeight: '700' as const },
+          headerRight: () => (
+            <View style={styles.headerRight}>
+              <Pressable
+                onPress={() => router.push('/search')}
+                style={styles.headerBtn}
+                hitSlop={8}
+              >
+                <MaterialCommunityIcons name="magnify" size={24} color="#FFF" />
+              </Pressable>
+              <View>
+                <Pressable
+                  onPress={() => router.push('/(tabs)/reminders')}
+                  style={styles.headerBtn}
+                  hitSlop={8}
+                >
+                  <MaterialCommunityIcons name="bell-outline" size={24} color="#FFF" />
+                </Pressable>
+                {upcoming.length > 0 && (
+                  <Badge size={16} style={styles.badge}>{upcoming.length}</Badge>
+                )}
+              </View>
+            </View>
+          ),
+        }}
+      />
 
       <FlatList
         data={BODY_PARTS}
@@ -114,12 +127,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
-  header: {
-    backgroundColor: Colors.primary,
+  headerRight: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    marginRight: 4,
   },
-  headerTitle: {
-    color: '#FFF',
-    fontWeight: '700',
+  headerBtn: {
+    paddingHorizontal: 8,
   },
   badge: {
     position: 'absolute',

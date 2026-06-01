@@ -1,17 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, ScrollView, StyleSheet, Alert } from 'react-native';
-import { Appbar, List, Switch, SegmentedButtons, Button, Text, Divider } from 'react-native-paper';
+import { List, Switch, SegmentedButtons, Button, Text, Divider, TextInput } from 'react-native-paper';
+import { Stack } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSettingsStore } from '@src/store/settingsStore';
 import { exportService } from '@src/services/exportService';
 import { fileService } from '@src/services/fileService';
 import { getDb } from '@src/db/database';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Colors, Spacing } from '@src/constants/theme';
+import { Colors, Spacing } from '@src/utils/theme';
 
 export default function SettingsScreen() {
-  const { currency, notificationsEnabled, setSetting } = useSettingsStore();
+  const { currency, notificationsEnabled, reminderTime, setSetting } = useSettingsStore();
   const [exporting, setExporting] = useState(false);
+  const [storageUsed, setStorageUsed] = useState<string>('–');
+  const [reminderInput, setReminderInput] = useState(reminderTime);
+
+  useEffect(() => {
+    fileService.getStorageUsedBytes()
+      .then(bytes => setStorageUsed((bytes / (1024 * 1024)).toFixed(1) + ' MB'))
+      .catch(() => setStorageUsed('–'));
+  }, []);
+
+  useEffect(() => {
+    setReminderInput(reminderTime);
+  }, [reminderTime]);
 
   async function handleExport() {
     setExporting(true);
@@ -49,11 +62,25 @@ export default function SettingsScreen() {
     );
   }
 
+  function handleReminderTimeBlur() {
+    const valid = /^\d{2}:\d{2}$/.test(reminderInput.trim());
+    if (valid) {
+      setSetting('reminderTime', reminderInput.trim());
+    } else {
+      setReminderInput(reminderTime);
+    }
+  }
+
   return (
     <SafeAreaView style={styles.safe} edges={['left', 'right']}>
-      <Appbar.Header style={styles.header}>
-        <Appbar.Content title="Settings" titleStyle={styles.headerTitle} />
-      </Appbar.Header>
+      <Stack.Screen
+        options={{
+          title: 'Settings',
+          headerStyle: { backgroundColor: Colors.primary },
+          headerTintColor: '#FFF',
+          headerTitleStyle: { fontWeight: '700' as const },
+        }}
+      />
 
       <ScrollView contentContainerStyle={styles.content}>
         <List.Section>
@@ -89,12 +116,38 @@ export default function SettingsScreen() {
               />
             )}
           />
+          <List.Item
+            title="Reminder Time"
+            description="Daily alert hour (HH:MM, 24-hr)"
+            right={() => (
+              <View style={styles.timeInputWrap}>
+                <TextInput
+                  value={reminderInput}
+                  onChangeText={setReminderInput}
+                  onBlur={handleReminderTimeBlur}
+                  onSubmitEditing={handleReminderTimeBlur}
+                  keyboardType="numbers-and-punctuation"
+                  style={styles.timeInput}
+                  dense
+                  mode="outlined"
+                  returnKeyType="done"
+                  maxLength={5}
+                  placeholder="09:00"
+                />
+              </View>
+            )}
+          />
         </List.Section>
 
         <Divider />
 
         <List.Section>
           <List.Subheader>Data</List.Subheader>
+          <List.Item
+            title="Storage Used"
+            description="Space used by attachments"
+            right={() => <Text style={styles.meta}>{storageUsed}</Text>}
+          />
           <View style={styles.buttonRow}>
             <Button
               mode="outlined"
@@ -133,10 +186,17 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-  header: { backgroundColor: Colors.primary },
-  headerTitle: { color: '#FFF', fontWeight: '700' },
   content: { paddingBottom: Spacing.xl },
   segment: { marginRight: Spacing.sm },
+  timeInputWrap: {
+    justifyContent: 'center',
+    marginRight: Spacing.sm,
+  },
+  timeInput: {
+    width: 84,
+    backgroundColor: Colors.surface,
+    fontSize: 14,
+  },
   buttonRow: { paddingHorizontal: Spacing.md, marginBottom: Spacing.sm },
   actionButton: { width: '100%' },
   dangerButton: { borderColor: Colors.error },

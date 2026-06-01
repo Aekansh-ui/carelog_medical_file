@@ -4,6 +4,7 @@ import { Attachment } from './Attachment';
 
 export interface Visit {
   id: string;                       // UUID v4
+  member_id: string;                // owning family member (UUID)
   body_part_id: BodyPartId;
   speciality_id: SpecialityId;
   custom_speciality?: string;       // Only when speciality_id === 'OTHER'

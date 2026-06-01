@@ -35,6 +35,18 @@ export function formatDaysRemaining(dateStr: string): string {
   return `${days} days left`;
 }
 
+/** Returns whole years of age from a YYYY-MM-DD date of birth. Returns 0 if DOB is in the future. */
+export function computeAge(dob: string): number {
+  const birth = parseISO(dob);
+  const now = new Date();
+  let age = now.getFullYear() - birth.getFullYear();
+  const monthDiff = now.getMonth() - birth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birth.getDate())) {
+    age--;
+  }
+  return Math.max(0, age);
+}
+
 export function formatCurrency(amount: number | undefined | null, currency = 'INR'): string {
   if (amount == null) return '';
   const symbols: Record<string, string> = { INR: '₹', USD: '$', EUR: '€' };

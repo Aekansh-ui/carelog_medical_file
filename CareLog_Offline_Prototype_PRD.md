@@ -1,10 +1,14 @@
 # CareLog — Offline Prototype PRD
-**Version:** 1.0-offline  
+**Version:** 1.1-family  
 **Status:** Active  
-**Date:** 2026-05-31  
+**Date:** 2026-06-01  
 **Scope:** Offline-only full working prototype with mock data and navigation  
 **Environment:** Expo SDK 51 + React Native 0.74 + TypeScript  
 **Intended Consumer:** Agentic AI development tool (Cursor / Claude / Copilot Workspace)  
+
+**Changelog**
+- **v1.1-family (2026-06-01):** Added multi-member (family) support. The app now manages health records for multiple family members. A new Family Home dashboard lists all members; tapping a member drills into that member's existing body-map → speciality → visit flow. See **[Section 14: Family Functionality Extension](#14-family-functionality-extension)** for the complete spec. All v1.0 sections below remain valid; Section 14 documents the additive changes (new `members` table, `member_id` foreign key on `visits`, new screens, new repository/store, migration & seed updates).
+- **v1.0-offline (2026-05-31):** Initial offline prototype (single patient).
 
 ---
 
@@ -65,6 +69,17 @@ RULES:
 11. [Shared UI Components](#11-shared-ui-components)
 12. [Design System](#12-design-system)
 13. [Acceptance Criteria](#13-acceptance-criteria)
+14. [Family Functionality Extension (v1.1)](#14-family-functionality-extension)
+    - 14.1 [Overview & Navigation Model](#141-overview--navigation-model)
+    - 14.2 [Constants](#142-constants)
+    - 14.3 [TypeScript Types](#143-typescript-types)
+    - 14.4 [Database Changes](#144-database-changes)
+    - 14.5 [Repositories](#145-repositories)
+    - 14.6 [State Management](#146-state-management)
+    - 14.7 [Navigation Changes](#147-navigation-changes)
+    - 14.8 [Screen Specifications](#148-screen-specifications)
+    - 14.9 [Seed Data Changes](#149-seed-data-changes)
+    - 14.10 [Acceptance Criteria (Family)](#1410-acceptance-criteria-family)
 
 ---
 
@@ -1769,6 +1784,486 @@ The prototype is complete when ALL of the following pass:
 
 ---
 
+## 14. Family Functionality Extension
+
+> **This section is additive to v1.0.** Everything in Sections 1–13 still applies. Where this section changes an existing artifact (e.g., the `visits` table, the Home screen, the root layout), the change is described explicitly. Build this extension only after the v1.0 prototype runs successfully.
+
+### 14.1 Overview & Navigation Model
+
+CareLog now stores health records for **multiple family members**. Each member owns an independent set of visits (and therefore attachments and reminders, which hang off visits). The two-layer navigation (Body Part → Speciality) is unchanged; a new **member layer** is added in front of it.
+
+**Navigation model — Family Home + drill-in:**
+
+```
+Tab 1: FAMILY HOME  (app/(tabs)/index.tsx — REWRITTEN)
+   │  Lists all members as cards + family summary (upcoming follow-ups).
+   │  "＋ Add" → /members/new
+   ▼  tap a member card
+MEMBER HOME  (app/member/[memberId].tsx — NEW; body-map grid moved here)
+   │  Header = member name. 2-column body-part grid + that member's recent visits.
+   ▼  tap a body part
+SPECIALITY  (app/speciality/[bodyPartId].tsx — now carries memberId)
+   ▼
+VISIT LIST  (app/visits/list/[specialityId].tsx — filtered by member + speciality)
+   ▼
+VISIT DETAIL / NEW / EDIT  (all carry & persist member_id)
+```
+
+**Key principles:**
+- `memberId` is threaded through the visit flow as a **route param** (not global mutable state) so deep navigation is unambiguous. A `memberStore` holds the member list and family summary for the dashboard.
+- Every visit belongs to exactly one member (`visits.member_id`, NOT NULL after migration).
+- Reminders and attachments inherit their member through their parent visit (JOIN), so no schema change is needed on those tables.
+- The Reminders and Reports tabs remain **family-wide** but now show a **member-name badge** on each row.
+- A default member **"Self"** is created automatically by migration; all pre-existing v1.0 visits are backfilled to it.
+
+### 14.2 Constants
+
+```typescript
+// src/constants/members.ts
+export type RelationshipType = 'SELF' | 'SPOUSE' | 'CHILD' | 'PARENT' | 'SIBLING' | 'OTHER';
+export type Gender = 'MALE' | 'FEMALE' | 'OTHER';
+
+export const RELATIONSHIPS: { id: RelationshipType; label: string; icon: string }[] = [
+  { id: 'SELF',    label: 'Self',    icon: 'account'        },
+  { id: 'SPOUSE',  label: 'Spouse',  icon: 'account-heart'  },
+  { id: 'CHILD',   label: 'Child',   icon: 'baby-face-outline' },
+  { id: 'PARENT',  label: 'Parent',  icon: 'account-supervisor' },
+  { id: 'SIBLING', label: 'Sibling', icon: 'account-multiple' },
+  { id: 'OTHER',   label: 'Other',   icon: 'account-question' },
+];
+
+export const GENDERS: { id: Gender; label: string }[] = [
+  { id: 'MALE',   label: 'Male'   },
+  { id: 'FEMALE', label: 'Female' },
+  { id: 'OTHER',  label: 'Other'  },
+];
+
+// Avatar color palette — one is assigned per member (cycled by creation order).
+export const MEMBER_COLORS = [
+  '#1A6B8A', '#2E9E6B', '#E67E22', '#8E44AD',
+  '#C0392B', '#16A085', '#D35400', '#2C3E50',
+];
+
+// Fixed id for the auto-created default member (created by migration 003).
+export const DEFAULT_SELF_MEMBER_ID = '11111111-1111-1111-1111-111111111111';
+```
+
+### 14.3 TypeScript Types
+
+```typescript
+// src/types/Member.ts
+import { RelationshipType, Gender } from '../constants/members';
+
+export interface Member {
+  id: string;                 // UUID v4
+  name: string;
+  relationship: RelationshipType;
+  date_of_birth?: string;     // YYYY-MM-DD (age computed client-side)
+  gender?: Gender;
+  color: string;              // avatar color (hex)
+  created_at: string;         // ISO 8601
+  updated_at: string;         // ISO 8601
+
+  // Computed/joined for dashboard (populated by membersRepository.findAllWithStats):
+  visit_count?: number;
+  next_follow_up?: string | null;   // earliest upcoming follow_up_date among member's visits
+  last_visit_date?: string | null;
+}
+
+export type CreateMemberInput =
+  Omit<Member, 'id' | 'created_at' | 'updated_at' | 'visit_count' | 'next_follow_up' | 'last_visit_date'>;
+export type UpdateMemberInput = Partial<CreateMemberInput>;
+
+export interface FamilySummary {
+  totalMembers: number;
+  totalVisits: number;
+  upcomingFollowUps: {
+    visit_id: string;
+    member_id: string;
+    member_name: string;
+    member_color: string;
+    speciality_id: string;
+    doctor_name?: string;
+    follow_up_date: string;
+  }[];
+}
+```
+
+**Change to `src/types/Visit.ts`** — add `member_id`:
+
+```typescript
+export interface Visit {
+  id: string;
+  member_id: string;          // NEW — owning family member (UUID)
+  body_part_id: BodyPartId;
+  // ...all existing fields unchanged...
+}
+```
+`CreateVisitInput` (the `Omit<...>`) automatically gains `member_id` since it is not in the omit list — callers must now supply it.
+
+### 14.4 Database Changes
+
+**New migration `src/db/migrations/003_family.sql`** (wire as version 3 in `database.ts` `MIGRATIONS` array):
+
+```sql
+CREATE TABLE IF NOT EXISTS members (
+  id            TEXT PRIMARY KEY,
+  name          TEXT NOT NULL,
+  relationship  TEXT NOT NULL DEFAULT 'OTHER',
+  date_of_birth TEXT,
+  gender        TEXT,
+  color         TEXT NOT NULL DEFAULT '#1A6B8A',
+  created_at    TEXT NOT NULL,
+  updated_at    TEXT NOT NULL
+);
+
+-- Add owning member to visits (nullable at first so existing rows survive ALTER).
+ALTER TABLE visits ADD COLUMN member_id TEXT REFERENCES members(id);
+
+CREATE INDEX IF NOT EXISTS idx_visits_member ON visits(member_id);
+
+-- Auto-create the default "Self" member with a fixed id.
+INSERT OR IGNORE INTO members (id, name, relationship, color, created_at, updated_at)
+VALUES (
+  '11111111-1111-1111-1111-111111111111',
+  'Self', 'SELF', '#1A6B8A',
+  '2026-06-01T00:00:00.000Z', '2026-06-01T00:00:00.000Z'
+);
+
+-- Backfill all pre-existing visits to the default member.
+UPDATE visits
+   SET member_id = '11111111-1111-1111-1111-111111111111'
+ WHERE member_id IS NULL;
+```
+
+> **Notes**
+> - SQLite cannot add a `NOT NULL` column without a default to a populated table, so `member_id` is added nullable and immediately backfilled. The application layer (repositories) treats it as required going forward.
+> - Member deletion cascades to visits/attachments/reminders **in the repository** (explicit transaction), not via the FK clause — SQLite FK cascade on an `ALTER`-added column is unreliable across connections. See 14.5.
+
+### 14.5 Repositories
+
+**New `src/db/membersRepository.ts`:**
+
+```typescript
+import { getDb } from './database';
+import { Member, CreateMemberInput, UpdateMemberInput, FamilySummary } from '../types/Member';
+import uuid from 'react-native-uuid';
+
+export const membersRepository = {
+  create(input: CreateMemberInput): Member {
+    const db = getDb();
+    const id = uuid.v4() as string;
+    const now = new Date().toISOString();
+    db.runSync(
+      `INSERT INTO members (id, name, relationship, date_of_birth, gender, color, created_at, updated_at)
+       VALUES (?,?,?,?,?,?,?,?)`,
+      [id, input.name, input.relationship, input.date_of_birth ?? null,
+       input.gender ?? null, input.color, now, now]
+    );
+    return { ...input, id, created_at: now, updated_at: now };
+  },
+
+  update(id: string, input: UpdateMemberInput): void {
+    const db = getDb();
+    const now = new Date().toISOString();
+    const fields = Object.keys(input).map(k => `${k} = ?`).join(', ');
+    db.runSync(`UPDATE members SET ${fields}, updated_at = ? WHERE id = ?`,
+      [...Object.values(input), now, id]);
+  },
+
+  // Cascade delete: member → their visits → attachments & reminders of those visits.
+  delete(id: string): void {
+    const db = getDb();
+    db.execSync('BEGIN');
+    try {
+      db.runSync(
+        `DELETE FROM attachments WHERE visit_id IN (SELECT id FROM visits WHERE member_id = ?)`, [id]);
+      db.runSync(
+        `DELETE FROM reminders   WHERE visit_id IN (SELECT id FROM visits WHERE member_id = ?)`, [id]);
+      db.runSync(`DELETE FROM visits  WHERE member_id = ?`, [id]);
+      db.runSync(`DELETE FROM members WHERE id = ?`, [id]);
+      db.execSync('COMMIT');
+    } catch (e) {
+      db.execSync('ROLLBACK');
+      throw e;
+    }
+  },
+
+  findById(id: string): Member | null {
+    return getDb().getFirstSync<Member>('SELECT * FROM members WHERE id = ?', [id]);
+  },
+
+  // Members + per-member stats for the Family Home dashboard.
+  findAllWithStats(): Member[] {
+    const today = new Date().toISOString().split('T')[0];
+    return getDb().getAllSync<Member>(
+      `SELECT m.*,
+              (SELECT COUNT(*) FROM visits v WHERE v.member_id = m.id) AS visit_count,
+              (SELECT MAX(v.visit_date) FROM visits v WHERE v.member_id = m.id) AS last_visit_date,
+              (SELECT MIN(v.follow_up_date) FROM visits v
+                 WHERE v.member_id = m.id AND v.follow_up_date >= ?) AS next_follow_up
+         FROM members m
+        ORDER BY (m.relationship = 'SELF') DESC, m.created_at ASC`,
+      [today]
+    );
+  },
+
+  getFamilySummary(): FamilySummary {
+    const db = getDb();
+    const today = new Date().toISOString().split('T')[0];
+    const totals = db.getFirstSync<{ members: number; visits: number }>(
+      `SELECT (SELECT COUNT(*) FROM members) AS members,
+              (SELECT COUNT(*) FROM visits)  AS visits`
+    );
+    const upcoming = db.getAllSync<any>(
+      `SELECT v.id AS visit_id, v.member_id, m.name AS member_name, m.color AS member_color,
+              v.speciality_id, v.doctor_name, v.follow_up_date
+         FROM visits v JOIN members m ON v.member_id = m.id
+        WHERE v.follow_up_date >= ?
+        ORDER BY v.follow_up_date ASC`,
+      [today]
+    );
+    return {
+      totalMembers: totals?.members ?? 0,
+      totalVisits: totals?.visits ?? 0,
+      upcomingFollowUps: upcoming,
+    };
+  },
+};
+```
+
+**Changes to `src/db/visitsRepository.ts`:**
+- `create(input)` — add `member_id` to the INSERT column list and values (`input.member_id`).
+- `findRecent(limit)` → add `findRecentByMember(memberId, limit)` that adds `WHERE member_id = ?`.
+- `findBySpeciality(bodyPartId, specialityId)` → add optional `memberId` param: `WHERE member_id = ? AND body_part_id = ? AND speciality_id = ?`.
+- `countBySpeciality(specialityId)` → add `countBySpecialityForMember(memberId, specialityId)` for the per-member speciality badges.
+- The existing family-wide methods (`findAll`, `search`) stay; search results should JOIN members to show a member badge (add `m.name AS member_name, m.color AS member_color`).
+
+### 14.6 State Management
+
+**New `src/store/memberStore.ts`:**
+
+```typescript
+import { create } from 'zustand';
+import { Member, CreateMemberInput, UpdateMemberInput, FamilySummary } from '../types/Member';
+import { membersRepository } from '../db/membersRepository';
+import { MEMBER_COLORS } from '../constants/members';
+
+interface MemberState {
+  members: Member[];
+  summary: FamilySummary | null;
+  loadMembers: () => void;
+  loadSummary: () => void;
+  createMember: (input: Omit<CreateMemberInput, 'color'>) => Member;  // color auto-assigned
+  updateMember: (id: string, input: UpdateMemberInput) => void;
+  deleteMember: (id: string) => void;
+  getMember: (id: string) => Member | undefined;
+}
+
+export const useMemberStore = create<MemberState>((set, get) => ({
+  members: [],
+  summary: null,
+
+  loadMembers: () => set({ members: membersRepository.findAllWithStats() }),
+  loadSummary: () => set({ summary: membersRepository.getFamilySummary() }),
+
+  createMember: (input) => {
+    const color = MEMBER_COLORS[get().members.length % MEMBER_COLORS.length];
+    const member = membersRepository.create({ ...input, color });
+    get().loadMembers();
+    return member;
+  },
+
+  updateMember: (id, input) => { membersRepository.update(id, input); get().loadMembers(); },
+  deleteMember: (id) => { membersRepository.delete(id); get().loadMembers(); get().loadSummary(); },
+  getMember: (id) => get().members.find(m => m.id === id),
+}));
+```
+
+**Changes to `src/store/visitsStore.ts`:**
+- `loadRecentVisits()` → `loadRecentVisitsForMember(memberId)` (keep family-wide variant if needed elsewhere).
+- `loadVisitsBySpeciality(bodyPartId, specialityId)` → accept `memberId` and pass through.
+- `createVisit(input)` — `input` now includes `member_id`; after create, refresh the member-scoped recent list and trigger `memberStore.loadSummary()`.
+- `getSpecialityCount` → `getSpecialityCountForMember(memberId, specialityId)`.
+
+**Add to `src/utils/dateUtils.ts`:** `computeAge(dob: string): number` — returns whole years from a `YYYY-MM-DD` DOB to today.
+
+### 14.7 Navigation Changes
+
+**`app/_layout.tsx`** — register the new routes inside the `<Stack>` (in addition to the existing seven):
+
+```tsx
+<Stack.Screen name="member/[memberId]"        options={{ headerShown: false }} />
+<Stack.Screen name="members/new"              options={{ title: 'Add Member',  presentation: 'modal' }} />
+<Stack.Screen name="members/edit/[memberId]"  options={{ title: 'Edit Member', presentation: 'modal' }} />
+```
+
+`member/[memberId]` sets `headerShown: false` because the Member Home renders its own `Stack.Screen` header (member name + search/bell), exactly like the v1 Home did.
+
+**`app/(tabs)/_layout.tsx`** — Tab 1 label/icon change only:
+- `index` tab: `title: 'Family'`, icon `account-group` (was `'Home'` / `home-heart`). The other three tabs are unchanged.
+
+### 14.8 Screen Specifications
+
+#### 14.8.1 Family Home — `app/(tabs)/index.tsx` (REWRITE)
+
+```
+┌─────────────────────────────────┐
+│  My Family            ＋ Add    │  ← header: title + add-member action
+├─────────────────────────────────┤
+│  ┌─────────┐  ┌─────────┐       │
+│  │ 👤       │  │ 👤       │      │  ← MemberCard (2-col grid)
+│  │ Rahul    │  │ Priya    │      │     avatar circle in member.color
+│  │ Self·32y │  │ Spouse   │      │     name · relationship · age
+│  │ 4 visits │  │ 2 visits │      │     visit_count
+│  │ ⏰ Jun 15 │  │ —        │      │     next_follow_up (or em-dash)
+│  └─────────┘  └─────────┘       │
+├─────────────────────────────────┤
+│  Upcoming Follow-ups            │  ← SectionHeader (family-wide)
+│  ┌───────────────────────────┐  │
+│  │ 🔵 Rahul · ENT            │  │  ← color dot = member.color
+│  │ Dr. Priya Sharma          │  │
+│  │ 15 Jun 2026 · 14 days     │  │
+│  └───────────────────────────┘  │
+│         (EmptyState if none)     │
+└─────────────────────────────────┘
+```
+
+**Implementation notes**
+- On mount (`useEffect`): `memberStore.loadMembers()` + `memberStore.loadSummary()`.
+- Use `useFocusEffect` (or re-load on focus) so counts refresh after returning from a member's flow.
+- Member grid: 2-column `FlatList` of `MemberCard`. Tap → `router.push('/member/' + member.id)`.
+- "＋ Add" (header right): `router.push('/members/new')`.
+- Family summary block lists `summary.upcomingFollowUps` (already date-sorted). Each row: member color dot + name + speciality + doctor + date + days-remaining (reuse the days-left helper from `ReminderCard`). Tap → `router.push('/visits/' + item.visit_id)`.
+- Empty states: zero members → `EmptyState` ("Add your first family member"); members but zero upcoming → `EmptyState` under the section header.
+
+#### 14.8.2 Member Home — `app/member/[memberId].tsx` (NEW — body map moved here)
+
+This is the **v1.0 Home screen content** (2-column body-part grid + recent visits strip + search/bell header), now scoped to one member.
+
+```
+┌─────────────────────────────────┐
+│  ← Rahul              🔍  🔔2   │  ← header: member name + search + bell
+├─────────────────────────────────┤
+│  [HEAD]    [CHEST]               │  ← BodyPartCard grid (unchanged)
+│  [ABDOMEN] [BACK]                │
+│  [ARMS]    [LEGS]                │
+│  [SKIN]    [GENERAL]             │
+├─────────────────────────────────┤
+│  Recent Visits — Rahul          │
+│  ┌──────┐ ┌──────┐ ┌──────┐     │  ← horizontal VisitCards (member-scoped)
+└─────────────────────────────────┘
+```
+
+**Implementation notes**
+- Read `memberId` via `useLocalSearchParams`. Resolve member via `memberStore.getMember(memberId)` (load members if empty) for the header title.
+- On mount: `visitsStore.loadRecentVisitsForMember(memberId)`.
+- Body part tap → `router.push({ pathname: '/speciality/' + bodyPart.id, params: { memberId } })`.
+- Recent visit tap → `router.push('/visits/' + visit.id)`.
+- Header renders its own `<Stack.Screen options={{ title: member?.name, headerRight: ... }}>` (search + bell badge), mirroring the original v1 Home implementation. Back arrow returns to Family Home automatically.
+
+#### 14.8.3 Member Form — `app/members/new.tsx` & `app/members/edit/[memberId].tsx` (NEW, modal)
+
+```
+┌─────────────────────────────────┐
+│  ✕ Add Member          [Save]   │
+├─────────────────────────────────┤
+│  Name           [_____________] │  ← required
+│  Relationship   [Self ▼ chips]  │  ← SegmentedButtons / chip row (RELATIONSHIPS)
+│  Date of Birth  [YYYY-MM-DD]    │  ← plain TextInput, validated on blur (optional)
+│  Gender         [M / F / Other] │  ← SegmentedButtons (optional)
+└─────────────────────────────────┘
+```
+
+**Functional requirements**
+- FR-MEM-01: `name` required; `relationship` defaults to `OTHER` (or `SELF` if no members exist yet). DOB and gender optional.
+- FR-MEM-02: DOB uses a plain `TextInput` (`YYYY-MM-DD`) with the same validator pattern used by visit dates — consistent with the v1 decision to avoid `@react-native-community/datetimepicker`.
+- FR-MEM-03: Save (new) → `memberStore.createMember(form)` (color auto-assigned) → `router.back()`.
+- FR-MEM-04: Edit mode pre-fills from `memberStore.getMember(id)`; save → `memberStore.updateMember(id, form)`.
+- FR-MEM-05: Edit screen shows a **Delete Member** destructive button → confirmation Alert warning that ALL of that member's visits, attachments and reminders will be deleted → `memberStore.deleteMember(id)` → `router.back()`. Guard: if it is the last remaining member, block deletion with an alert.
+
+#### 14.8.4 Threading `memberId` through the visit flow
+
+| Screen | Change |
+|---|---|
+| `app/speciality/[bodyPartId].tsx` | Read `memberId` from params; pass it to `getSpecialityCountForMember`; forward `memberId` in the push to the visit list and to `/visits/new`. |
+| `app/visits/list/[specialityId].tsx` | Read `memberId`; call `loadVisitsBySpeciality(bodyPartId, specialityId, memberId)`; forward `memberId` to `/visits/new`. |
+| `app/visits/new.tsx` | Read `memberId` from params; include it in the form's initial state and in `createVisit`. |
+| `app/visits/edit/[visitId].tsx` | `member_id` is read from the loaded visit and preserved on update (not user-editable in v1.1). |
+| `app/visits/[visitId].tsx` | Show a member chip (name + color dot) alongside the speciality/body-part chips. |
+| `app/(tabs)/reminders.tsx` | Add member-name badge to each `ReminderCard` (reminder → visit → member JOIN already available via `remindersRepository`; add `member_name`, `member_color`). |
+| `app/(tabs)/reports.tsx` | Add member-name badge to each attachment card (attachments → visit → member JOIN). |
+
+> **`remindersRepository` / `attachmentsRepository` tweak:** extend their JOINed SELECTs to also pull `m.name AS member_name, m.color AS member_color` (JOIN members `m` ON `v.member_id = m.id`). Add `member_name`/`member_color` to the `Reminder` and `Attachment` types as optional joined fields.
+
+#### 14.8.5 New shared component — `MemberCard`
+
+```typescript
+interface MemberCardProps {
+  member: Member;        // includes visit_count, next_follow_up
+  onPress: () => void;
+}
+```
+Renders: circular avatar (initials on `member.color`), name, relationship + age (from `computeAge(date_of_birth)`), visit count, next follow-up date (or em-dash).
+
+#### 14.8.6 New shared component — `MemberBadge`
+
+```typescript
+interface MemberBadgeProps {
+  name: string;
+  color: string;
+  size?: 'sm' | 'md';
+}
+```
+A small pill: colored dot + member name. Used on Reminders, Reports, Search, and the Family Summary list.
+
+### 14.9 Seed Data Changes
+
+The v1.0 seed (`seedIfNeeded`, key `@CareLog_seeded_v1`) must set `member_id` on its mock visits. Add a **separate family seed** so existing installs (already past v1 seed) still get demo members.
+
+**`src/db/seed.ts` changes:**
+1. In the existing `MOCK_VISITS` loop, set `member_id: DEFAULT_SELF_MEMBER_ID` on each visit (the migration guarantees that member exists).
+2. Add `seedFamilyIfNeeded()` (new key `@CareLog_seeded_family_v1`), called from `app/_layout.tsx` right after `seedIfNeeded()`:
+   - Create three members: **Priya** (SPOUSE, F), **Aarav** (CHILD, M, DOB making him ~8y), **Sita** (PARENT, F).
+   - Create ~1–2 mock visits per new member (e.g., Aarav → ENT/Pediatric-style GENERAL_MEDICINE; Priya → GYNAECOLOGY; Sita → CARDIOLOGY with a future follow-up).
+   - Create a reminder for at least one new member's future follow-up so the family summary shows multiple members.
+   - Set the new key.
+
+**`app/_layout.tsx` init order becomes:** `initDatabase()` → `seedIfNeeded()` → `seedFamilyIfNeeded()` → `loadSettings()`.
+
+**`app/(tabs)/settings.tsx` — `handleDeleteAll`:** also `DELETE FROM members WHERE id != DEFAULT_SELF_MEMBER_ID;` (keep Self), and remove both seed keys (`@CareLog_seeded_v1`, `@CareLog_seeded_family_v1`) so a relaunch re-seeds a clean family. Keep the default Self member so the app is never memberless.
+
+### 14.10 Acceptance Criteria (Family)
+
+**Members — CRUD**
+- [ ] AC-F01: Family Home lists all members; on a fresh/migrated install at least the "Self" member is present.
+- [ ] AC-F02: "＋ Add" opens the member modal; saving a member with only a name succeeds and the card appears immediately.
+- [ ] AC-F03: Editing a member pre-fills all fields and persists changes.
+- [ ] AC-F04: Deleting a member removes the member AND all their visits/attachments/reminders; deletion of the last remaining member is blocked.
+- [ ] AC-F05: A unique avatar color is assigned per member and used consistently on cards and badges.
+
+**Member-scoped flow**
+- [ ] AC-F06: Tapping a member card opens that member's body-map home with their name in the header.
+- [ ] AC-F07: The body-part → speciality → visit-list flow shows ONLY the selected member's visits.
+- [ ] AC-F08: Speciality cards show per-member visit counts (not family-wide totals).
+- [ ] AC-F09: Creating a visit from inside a member's flow saves with that `member_id` and appears only under that member.
+- [ ] AC-F10: A visit created for Member A never appears in Member B's lists.
+
+**Migration & data integrity**
+- [ ] AC-F11: After upgrading an existing v1.0 install, all previously-created visits appear under the "Self" member (no orphans, no data loss).
+- [ ] AC-F12: Re-launching the app does not duplicate members or visits (both seed guards respected).
+
+**Family summary & badges**
+- [ ] AC-F13: Family Home "Upcoming Follow-ups" lists follow-ups across ALL members, date-sorted, each tagged with the correct member name/color; tapping opens the linked visit.
+- [ ] AC-F14: Reminders and Reports tabs show a member-name badge on each row.
+- [ ] AC-F15: Member card shows correct visit count and next follow-up date; family summary updates after add/delete of a visit or member.
+
+**Empty states**
+- [ ] AC-F16: With zero non-Self members, Family Home still renders (Self card + empty/summary states) without crashing.
+- [ ] AC-F17: A newly added member with no visits shows an empty Recent Visits strip and zero counts, no crash.
+
+---
+
 *End of Document*  
-*CareLog Offline Prototype PRD v1.0 | 2026-05-31*  
+*CareLog Offline Prototype PRD v1.1-family | 2026-06-01*  
 *Scope: Offline-only | Environment: Expo SDK 51 | Consumer: Agentic AI*

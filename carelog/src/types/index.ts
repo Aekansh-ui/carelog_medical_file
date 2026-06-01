@@ -1,4 +1,5 @@
 export type { Visit, CreateVisitInput, UpdateVisitInput, VisitDraft } from './Visit';
+export type { Member, CreateMemberInput, UpdateMemberInput, FamilySummary } from './Member';
 export type {
   Attachment,
   AttachmentType,

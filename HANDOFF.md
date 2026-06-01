@@ -1,7 +1,7 @@
 ## CareLog Handoff Note
 **Date:** 2026-06-01
-**Session Completed:** 4
-**Last command completed:** Command 3 — `app/search.tsx` (Global Search screen)
+**Session Completed:** 5 (full project audit + pre-run fixes)
+**Last command completed:** Audit & fix — app ready for first run
 
 ---
 
@@ -43,6 +43,8 @@ carelog/src/constants/specialities.ts
 carelog/src/constants/theme.ts
 carelog/src/db/attachmentsRepository.ts
 carelog/src/db/database.ts
+carelog/src/db/migrations/001_create_tables.sql
+carelog/src/db/migrations/002_create_fts.sql
 carelog/src/db/remindersRepository.ts
 carelog/src/db/seed.ts
 carelog/src/db/visitsRepository.ts
@@ -62,47 +64,67 @@ carelog/src/utils/theme.ts
 carelog/src/utils/validators.ts
 ```
 
+**Assets**
+```
+carelog/assets/notification-icon.png   ← placeholder (copied from icon.png)
+```
+
 ---
 
-### Files Partially Complete
+### Session 5 Fixes Applied
 
-**`carelog/app/(tabs)/settings.tsx`** — functional but has three issues:
-1. Wrong import: `@src/constants/theme` → must be `@src/utils/theme`
-2. Still uses `Appbar.Header` — causes double header because `(tabs)/_layout.tsx` already provides a header via `screenOptions`. Remove `Appbar.Header` and let the tab navigator render it.
-3. Missing two PRD features: **Storage used** display (call `fileService.getStorageUsedBytes()` and format as MB) and **Reminder time** picker (HH:MM TextInput to set the daily notification hour, persisted via `settingsStore.setSetting('reminderTime', ...)`)
+| File | Fix |
+|---|---|
+| `app/(tabs)/index.tsx` | Removed `<Appbar.Header>` block; added `<Stack.Screen options={{ headerRight: ... }}>` with search icon + bell badge |
+| `app/(tabs)/settings.tsx` | Fixed import `@src/constants/theme` → `@src/utils/theme`; removed `<Appbar.Header>` block; added Storage Used row (calls `fileService.getStorageUsedBytes()`); added Reminder Time TextInput (reads/writes `settingsStore` key `reminderTime`) |
+| `assets/notification-icon.png` | Created placeholder (copied from `assets/images/icon.png`) to satisfy `app.json` expo-notifications plugin config |
 
-**`carelog/app/(tabs)/index.tsx`** — still has an `Appbar.Header` + `Appbar.Content` block (confirmed by grep). The tab navigator's `screenOptions` already applies the header, so this produces a double header. Remove the `Appbar.Header` / `Appbar.Content` block and let the tab navigator handle it.
+---
+
+### Audit Results (Session 5)
+
+All items below were audited and confirmed clean:
+
+- ✅ All `@src/*` path aliases resolve to existing files
+- ✅ `babel.config.js` — `babel-preset-expo` in SDK 51 reads tsconfig paths automatically, no extra plugin needed
+- ✅ `app/_layout.tsx` — `initDatabase()` → `seedIfNeeded()` → `loadSettings()` all called sequentially, guarded by `isReady` splash
+- ✅ Every screen calls the correct store load action in `useEffect` on mount
+- ✅ All `router.push()` strings match actual file paths in `app/`
+- ✅ `(tabs)/_layout.tsx` registers exactly 4 tabs: index, reports, reminders, settings
+- ✅ Stack in `app/_layout.tsx` registers all 7 routes: `(tabs)`, `speciality/[bodyPartId]`, `visits/list/[specialityId]`, `visits/[visitId]`, `visits/new`, `visits/edit/[visitId]`, `search`
+
+---
+
+### Known Issues (unchanged from Session 4)
+
+| # | File | Issue |
+|---|------|-------|
+| 1 | `src/services/exportService.ts` | Imports `react-native-html-to-pdf` which requires native linking — works in a bare/dev-client build but will throw at runtime in Expo Go. The package is in `package.json` so a bare build should be fine. |
+| 2 | `react-native-pdf` | Listed in `package.json` but never imported or used by any screen. The attachment viewer uses `Linking.openURL` for PDFs instead. Either remove the dep or implement a proper in-app PDF viewer in a later session. |
+| 3 | No `@react-native-community/datetimepicker` | Not installed. All date fields use plain `TextInput` with YYYY-MM-DD format and client-side validation. This is intentional for offline MVP but noticeable UX gap. |
+| 4 | `assets/notification-icon.png` | Placeholder only (copy of app icon). Replace with a proper 96×96 white-on-transparent PNG before production build. |
+| 5 | `components/` root directory | Contains unused Expo default scaffold files (`EditScreenInfo.tsx`, `ExternalLink.tsx`, `Themed.tsx`, etc.). Safe to delete. |
 
 ---
 
 ### Next Session Should Start With
 
-Fix the two double-header issues and the two missing settings features, then do the first run:
+The app is ready to run. Start with:
 
-> **Paste this prompt:**
->
-> Fix the following issues before we run the app for the first time:
->
-> 1. `app/(tabs)/index.tsx` — remove the `<Appbar.Header>` / `<Appbar.Content>` block entirely. The tab navigator in `(tabs)/_layout.tsx` already provides the header via `screenOptions`. The search icon and bell badge that were inside `Appbar.Header` should be moved to `<Stack.Screen options={{ headerRight: ... }}>` rendered inside the component, following the same pattern used in `app/(tabs)/reports.tsx`.
->
-> 2. `app/(tabs)/settings.tsx` — (a) fix the import `@src/constants/theme` → `@src/utils/theme`; (b) remove the `<Appbar.Header>` block for the same reason; (c) add a **Storage Used** row in the Data section that calls `fileService.getStorageUsedBytes()` on mount and displays the result formatted as `X.X MB`; (d) add a **Reminder Time** row in the Notifications section with a TextInput (HH:MM format, numeric keyboard) that reads from and writes to `settingsStore` key `reminderTime` — default `"09:00"`.
->
-> After both fixes, run `cd /home/aekansh/Desktop/carelog_medical_record/carelog && npx expo start` and report what you see.
+```bash
+cd /home/aekansh/Desktop/carelog_medical_record/carelog
+npm install
+npx expo start
+```
 
----
-
-### Known Issues
-
-| # | File | Issue |
-|---|------|-------|
-| 1 | `app/(tabs)/index.tsx` | `Appbar.Header` double-header (tab navigator already provides one) |
-| 2 | `app/(tabs)/settings.tsx` | Same double-header + wrong import path + missing Storage Used + missing Reminder Time controls |
-| 3 | `src/services/exportService.ts` | Imports `react-native-html-to-pdf` which requires native linking — works in a bare/dev-client build but will throw at runtime in Expo Go. The package is in `package.json` so a bare build should be fine. |
-| 4 | `react-native-pdf` | Listed in `package.json` but never imported or used by any screen. The attachment viewer uses `Linking.openURL` for PDFs instead. Either remove the dep or implement a proper in-app PDF viewer in a later session. |
-| 5 | No `@react-native-community/datetimepicker` | Not installed. All date fields (visit date, follow-up date, reschedule picker) use plain `TextInput` with YYYY-MM-DD format and client-side validation. This is intentional for offline MVP but noticeable UX gap. |
-| 6 | Missing `assets/notification-icon.png` | `notificationService.ts` may need a 96×96 PNG at this path for Android notification icons. Add a placeholder before first run on Android. |
-| 7 | `components/` root directory | Contains unused Expo default scaffold files (`EditScreenInfo.tsx`, `ExternalLink.tsx`, `Themed.tsx`, etc.). Safe to delete — nothing in `app/` or `src/` imports them. |
-| 8 | `settingsStore` has no `reminderTime` key | PRD Section 10.8 specifies a reminder time picker. The store's `setSetting` is generic, so adding `reminderTime` requires only a default value in the store initialiser and a UI row in settings — no DB migration needed (AsyncStorage-backed). |
+After first run, test these acceptance criteria in order:
+1. Splash screen shows, then Home loads with 8 body part cards
+2. Recent Visits strip shows 5 seeded visits
+3. Tap a body part → Speciality screen shows filtered specialities
+4. Tap a speciality → Visit list for that combination
+5. Tap a visit card → Visit Detail
+6. Reminders tab → 2 upcoming reminders (ENT + Cardiology)
+7. Settings tab → Currency, Reminder Time, Storage Used all visible
 
 ---
 
@@ -110,10 +132,10 @@ Fix the two double-header issues and the two missing settings features, then do 
 
 | Decision | PRD Spec | What Was Built | Reason |
 |---|---|---|---|
-| `VisitForm` extracted as shared component | PRD shows `new.tsx` and `edit/[visitId].tsx` as separate full forms | Single `VisitForm` (`forwardRef` + `useImperativeHandle`) shared by both screens | Avoids ~350-line duplication; parent screens call `formRef.current.getForm()` at save time |
-| All screen headers use `Stack.Screen options={}` inline | PRD doesn't specify implementation | `Appbar.Header` removed from all stack screens; tab screens use tab navigator header | Fixes double-header bug caused by both Stack and Appbar rendering simultaneously |
-| Swipe-to-reveal in Reminders uses `PanResponder` | PRD says "swipe left" (implies react-native-gesture-handler `Swipeable`) | Custom `Animated.View` + `PanResponder` row | `react-native-gesture-handler` not in `package.json`; core RN `PanResponder` achieves the same without a new dep |
-| Reschedule picker is a TextInput modal | PRD says "date picker" (implies `@react-native-community/datetimepicker`) | `Modal` with `TextInput` YYYY-MM-DD + regex + `parseISO` validation | Package not installed; consistent with all other date inputs in the app |
-| Share/Save-to-Device uses `Share.share` | PRD says "Save to Device" as a distinct action | Both Share and Save-to-Device call `Share.share({ url: fileUri })` | `expo-media-library` and `expo-sharing` not in `package.json`; native share sheet lets user pick "Save Image" / "Save to Files" |
-| FTS5 match hint is client-side `includes()` | PRD says "show matched field hint" | `getMatchHint()` probes `doctor_name`, `clinic_name`, `symptoms`, `diagnosis`, `notes` with `toLowerCase().includes()` | FTS5 doesn't return which column matched; `includes()` is accurate for non-stemmed queries; falls back to "Matched in: visit content" for stemmed hits |
-| SectionList per-section empty states use sentinel items | SectionList has no per-section `ListEmptyComponent` | `{ __empty: true, section: 'upcoming' \| 'past' }` sentinel injected into empty sections; `renderItem` detects and renders section-specific empty UI | Standard React Native pattern for independent section-level empty states |
+| `VisitForm` extracted as shared component | PRD shows `new.tsx` and `edit/[visitId].tsx` as separate full forms | Single `VisitForm` (`forwardRef` + `useImperativeHandle`) shared by both screens | Avoids ~350-line duplication |
+| Visit list route is `visits/list/[specialityId]` | PRD shows `visits/[specialityId]` | `app/visits/list/[specialityId].tsx` | Avoids route collision with `visits/[visitId]` (same dynamic segment pattern) |
+| All screen headers use `Stack.Screen options={}` inline | PRD doesn't specify implementation | `Appbar.Header` removed from all screens; tab screens use tab navigator header overridden via `Stack.Screen` | Fixes double-header bug |
+| Swipe-to-reveal in Reminders uses `PanResponder` | PRD says "swipe left" | Custom `Animated.View` + `PanResponder` row | `react-native-gesture-handler` not in `package.json` |
+| Reschedule picker is a TextInput modal | PRD says "date picker" | `Modal` with `TextInput` YYYY-MM-DD | `@react-native-community/datetimepicker` not installed |
+| Share/Save-to-Device uses `Share.share` | PRD says "Save to Device" | Both call `Share.share({ url: fileUri })` | `expo-media-library` not in `package.json` |
+| `babel-preset-expo` handles `@src/*` aliases | — | No `babel-plugin-module-resolver` needed | SDK 51's `babel-preset-expo` v11 reads tsconfig paths automatically |
