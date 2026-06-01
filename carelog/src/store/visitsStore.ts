@@ -10,7 +10,9 @@ interface VisitsState {
   isLoading: boolean;
 
   loadRecentVisits: () => void;
-  loadVisitsBySpeciality: (bodyPartId: string, specialityId: string) => void;
+  loadRecentVisitsForMember: (memberId: string) => void;
+  // memberId is optional for backward compat; when provided uses the member-scoped query
+  loadVisitsBySpeciality: (bodyPartId: string, specialityId: string, memberId?: string) => void;
   loadVisitById: (id: string) => void;
   createVisit: (input: CreateVisitInput) => Visit;
   updateVisit: (id: string, input: UpdateVisitInput) => void;
@@ -18,6 +20,7 @@ interface VisitsState {
   searchVisits: (query: string) => void;
   clearSearch: () => void;
   getSpecialityCount: (specialityId: string) => number;
+  getSpecialityCountForMember: (memberId: string, specialityId: string) => number;
   getAutocompleteDoctors: (partial: string) => string[];
   getAutocompleteClinics: (partial: string) => string[];
 }
@@ -34,9 +37,16 @@ export const useVisitsStore = create<VisitsState>((set, get) => ({
     set({ recentVisits: visits });
   },
 
-  loadVisitsBySpeciality: (bodyPartId, specialityId) => {
+  loadRecentVisitsForMember: (memberId) => {
+    const visits = visitsRepository.findRecentByMember(memberId, 5);
+    set({ recentVisits: visits });
+  },
+
+  loadVisitsBySpeciality: (bodyPartId, specialityId, memberId) => {
     set({ isLoading: true });
-    const visits = visitsRepository.findBySpeciality(bodyPartId, specialityId);
+    const visits = memberId
+      ? visitsRepository.findBySpecialityForMember(memberId, bodyPartId, specialityId)
+      : visitsRepository.findBySpeciality(bodyPartId, specialityId);
     set({ currentSpecialityVisits: visits, isLoading: false });
   },
 
@@ -47,7 +57,9 @@ export const useVisitsStore = create<VisitsState>((set, get) => ({
 
   createVisit: (input) => {
     const visit = visitsRepository.create(input);
-    get().loadRecentVisits();
+    // Refresh the member-scoped recent list so Member Home updates immediately.
+    // Family Home reloads summary via useFocusEffect on next focus — no store cycle needed.
+    get().loadRecentVisitsForMember(input.member_id);
     return visit;
   },
 
@@ -72,6 +84,9 @@ export const useVisitsStore = create<VisitsState>((set, get) => ({
 
   getSpecialityCount: (specialityId) =>
     visitsRepository.countBySpeciality(specialityId),
+
+  getSpecialityCountForMember: (memberId, specialityId) =>
+    visitsRepository.countBySpecialityForMember(memberId, specialityId),
 
   getAutocompleteDoctors: (partial) =>
     visitsRepository.getAutocompleteDoctors(partial),
