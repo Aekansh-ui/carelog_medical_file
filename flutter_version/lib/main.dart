@@ -1,60 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'theme/app_theme.dart';
+import 'app.dart';
+import 'providers/database_provider.dart';
+import 'providers/settings_provider.dart';
+import 'services/seed.dart';
 
-void main() {
-  // P5 will replace the placeholder home with the go_router shell, and the
-  // bootstrap sequence (init Drift → seed → load settings) will run here.
-  runApp(const ProviderScope(child: CareLogApp()));
-}
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
 
-class CareLogApp extends StatelessWidget {
-  const CareLogApp({super.key});
+  final container = ProviderContainer();
 
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'CareLog',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
-      home: const _BootstrapPlaceholder(),
-    );
-  }
-}
+  // Init Drift — creates the AppDatabase instance and opens the SQLite file.
+  final db = container.read(databaseProvider);
 
-/// Temporary landing screen for P0. Confirms the theme is wired and the app
-/// boots. Replaced by the navigation shell in P5.
-class _BootstrapPlaceholder extends StatelessWidget {
-  const _BootstrapPlaceholder();
+  // Seed demo data on first launch (each function is idempotent via prefs flag).
+  await seedIfNeeded(db);
+  await seedFamilyIfNeeded(db);
+  await seedInsuranceIfNeeded(db);
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.08),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.monitor_heart_outlined,
-                size: 64,
-                color: AppColors.primary,
-              ),
-            ),
-            const SizedBox(height: Spacing.md),
-            Text('CareLog', style: AppText.h1.copyWith(color: AppColors.primary)),
-            const SizedBox(height: Spacing.xs),
-            const Text('Your health, organised', style: AppText.caption),
-          ],
-        ),
-      ),
-    );
-  }
+  // Load persisted settings (currency, notifications, reminder time).
+  await container.read(settingsProvider.notifier).load();
+
+  runApp(UncontrolledProviderScope(container: container, child: const CareLogApp()));
 }

@@ -70,6 +70,45 @@ class FamilySummary {
   });
 }
 
+/// A visit attachment joined to its visit and member (Reports grid — AC-F14).
+class AttachmentWithVisit {
+  final Attachment attachment;
+  final String? visitId;
+  final String? visitDate;
+  final String? doctorName;
+  final String? specialityId;
+  final String? memberName;
+  final String? memberColor;
+  const AttachmentWithVisit({
+    required this.attachment,
+    this.visitId,
+    this.visitDate,
+    this.doctorName,
+    this.specialityId,
+    this.memberName,
+    this.memberColor,
+  });
+}
+
+/// A reminder row joined to its visit and member — mirrors the RN Reminder type
+/// which carries joined fields from the reminders × visits × members query.
+class ReminderWithVisit {
+  final Reminder reminder;
+  final String? doctorName;
+  final String? specialityId;
+  final String? bodyPartId;
+  final String? memberName;
+  final String? memberColor;
+  const ReminderWithVisit({
+    required this.reminder,
+    this.doctorName,
+    this.specialityId,
+    this.bodyPartId,
+    this.memberName,
+    this.memberColor,
+  });
+}
+
 /// An insurance policy plus its attached-document count (list screen chip).
 class PolicyWithDocCount {
   final InsurancePolicy policy;

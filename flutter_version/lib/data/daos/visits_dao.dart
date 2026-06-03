@@ -126,12 +126,13 @@ class VisitsDao extends DatabaseAccessor<AppDatabase> with _$VisitsDaoMixin {
     return row.read(c) ?? 0;
   }
 
-  Future<Map<String, int>> countsBySpeciality() async {
+  Future<Map<String, int>> countsBySpeciality({String? memberId}) async {
     final c = visits.id.count();
-    final rows = await (selectOnly(visits)
-          ..addColumns([visits.specialityId, c])
-          ..groupBy([visits.specialityId]))
-        .get();
+    final q = selectOnly(visits)
+      ..addColumns([visits.specialityId, c])
+      ..groupBy([visits.specialityId]);
+    if (memberId != null) q.where(visits.memberId.equals(memberId));
+    final rows = await q.get();
     return {
       for (final r in rows) r.read(visits.specialityId)!: r.read(c) ?? 0,
     };
