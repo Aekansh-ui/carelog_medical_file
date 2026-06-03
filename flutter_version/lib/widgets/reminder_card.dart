@@ -42,7 +42,8 @@ class ReminderCard extends StatelessWidget {
           border: Border.all(color: AppColors.border),
           boxShadow: AppShadow.card,
         ),
-        child: Row(
+        child: IntrinsicHeight(
+          child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Left accent bar
@@ -171,6 +172,7 @@ class ReminderCard extends StatelessWidget {
               ),
             ),
           ],
+        ),
         ),
       ),
     );

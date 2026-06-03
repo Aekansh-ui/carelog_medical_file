@@ -203,7 +203,7 @@ class _VisitFormScreenState extends ConsumerState<VisitFormScreen> {
       path = img.path;
       mimeType = img.mimeType ?? 'image/jpeg';
     } else if (source == 'pdf') {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf'],
         allowMultiple: false,

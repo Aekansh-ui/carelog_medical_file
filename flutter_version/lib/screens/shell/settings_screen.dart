@@ -191,6 +191,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: Column(
               children: [
                 SwitchListTile(
+                  tileColor: Colors.transparent,
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Enable Reminders',
                       style: AppText.body),
@@ -270,6 +271,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: Column(
               children: [
                 ListTile(
+                  tileColor: Colors.transparent,
                   contentPadding: EdgeInsets.zero,
                   leading: Container(
                     width: 36,
@@ -296,6 +298,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 const Divider(height: 1, color: AppColors.border),
                 ListTile(
+                  tileColor: Colors.transparent,
                   contentPadding: EdgeInsets.zero,
                   leading: Container(
                     width: 36,

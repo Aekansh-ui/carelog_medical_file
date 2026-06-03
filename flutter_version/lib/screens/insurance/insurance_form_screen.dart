@@ -187,7 +187,7 @@ class _InsuranceFormScreenState extends ConsumerState<InsuranceFormScreen> {
       path = img.path;
       mimeType = img.mimeType ?? 'image/jpeg';
     } else if (source == 'pdf') {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf'],
       );
